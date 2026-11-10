@@ -86,6 +86,20 @@ n9RUAlLb+lEeAIJjfcnbESVT2eJqAkTxQCB3TPhgyokhXESu5J1LBG0kAYorGsyptxSH+kGXMuI7K2l1
    const heading=freshShot?desired:prev+Math.max(-12*dt,Math.min(12*dt,delta));
    if(freshShot)t.lastVisualShotAt=t.aimShotAt;
    headings.set(id,heading);
+   // v10.7.3: muzzle coordinates follow the SAME actual 3D turret heading.
+   // Shader isometric projection: screenX=.70*(worldX-worldZ),
+   // screenY=.33*(worldX+worldZ)-worldY.
+   // Weapon GLBs point along local +X; heading rotates X towards -Z.
+   // Keep the anchor in WORLD canvas pixels; screen viewport is applied by overlay.
+   if(t.type==='mg'||t.type==='gun'){
+    const cs=Math.cos(heading),sn=Math.sin(heading);
+    const muzzleLength=t.type==='gun'?4.15:3.75;
+    const barrelHeight=t.type==='gun'?2.35:2.05;
+    const unit=17.1;
+    const dx=unit*.70*muzzleLength*(cs+sn);
+    const dy=unit*(.33*muzzleLength*(cs-sn)-barrelHeight);
+    t.visualMuzzle={x:(x+.5)*CELL+dx,y:(y+.5)*CELL+3+dy,angle:Math.atan2(.33*(cs-sn),.70*(cs+sn))};
+   }
    gl.uniform2f(loc.origin,view.ox+(x+.5)*CELL*view.scale,view.oy+(y+.5)*CELL*view.scale+3*view.scale);
    gl.uniform1f(loc.unit,17.1*view.scale);
    drawPart(parts[0],0);
