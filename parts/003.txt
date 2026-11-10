@@ -564,7 +564,7 @@ function drawAARockets(){
  const w=Math.max(1,Math.round(b.width*d)),h=Math.max(1,Math.round(b.height*d));
  if(aaEffectsCanvas.width!==w||aaEffectsCanvas.height!==h){aaEffectsCanvas.width=w;aaEffectsCanvas.height=h;}
  ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,b.width,b.height);
- if(!aaFxOn)return;
+ if(!aaFxOn){ctx.save();ctx.translate(view.ox,view.oy);ctx.scale(view.scale,view.scale);drawCombatFX(ctx);ctx.restore();return;}
  ctx.save();ctx.translate(view.ox,view.oy);ctx.scale(view.scale,view.scale);
  for(const p of aaSmoke){
    const a=Math.max(0,p.life/p.maxLife);
@@ -597,6 +597,7 @@ function drawAARockets(){
    for(let j=0;j<7;j++){let a=j*6.283/7;ctx.beginPath();ctx.moveTo(p.x+Math.cos(a)*r*.4,p.y+Math.sin(a)*r*.4);ctx.lineTo(p.x+Math.cos(a)*r*1.2,p.y+Math.sin(a)*r*1.2);ctx.stroke();}
    ctx.restore();
  }
+ drawCombatFX(ctx);
  // Вспышки оружия рисуем в верхнем слое, ПОВЕРХ WebGL-моделей.
  // Координаты в единицах игрового мира; тот же transform, что и у ракет.
  for(const p of muzzleFlashes){
@@ -701,8 +702,10 @@ function addMuzzleFlash(x,y,tx,ty,type){
  const life=type==='gun'?.26:.18;
  const angle=Math.atan2(ty-y,tx-x);
  // Выводим эффект у конца ствола, а не под 3D-корпусом башни.
- const barrelOffset=type==='gun'?22:17;
- muzzleFlashes.push({x:(x+.5)*CELL+Math.cos(angle)*barrelOffset,y:(y+.5)*CELL+Math.sin(angle)*barrelOffset-6,angle,life,maxLife:life,type});
+ const barrelOffset=type==='gun'?24:18;
+ // У 3D-модели основание находится в центре клетки, а оружие поднято над ним.
+ const turretHeight=type==='gun'?38:32;
+ muzzleFlashes.push({x:(x+.5)*CELL+Math.cos(angle)*barrelOffset,y:(y+.5)*CELL+Math.sin(angle)*barrelOffset-turretHeight,angle,life,maxLife:life,type});
  if(muzzleFlashes.length>80)muzzleFlashes.splice(0,muzzleFlashes.length-80);
 }
 function advanceCombatFX(dt){
@@ -711,13 +714,17 @@ function advanceCombatFX(dt){
  for(const p of muzzleFlashes)p.life-=dt;
  muzzleFlashes=muzzleFlashes.filter(p=>p.life>0);
 }
-function drawCombatFX(){
- ctx.save();
+function drawCombatFX(overlayCtx){
+ // Рисуем искры поверх вражеских силуэтов и WebGL-башен.
+ overlayCtx.save();
  for(const p of combatSparks){
   const a=Math.max(0,p.life/p.maxLife);
-  ctx.globalAlpha=a*.88;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.5,1.9*a),0,Math.PI*2);ctx.fill();
+  overlayCtx.globalAlpha=Math.min(1,a);
+  overlayCtx.fillStyle=p.color;
+  overlayCtx.shadowColor=p.color;overlayCtx.shadowBlur=4;
+  overlayCtx.beginPath();overlayCtx.arc(p.x,p.y,Math.max(1.3,3.4*a),0,Math.PI*2);overlayCtx.fill();
  }
- ctx.restore();
+ overlayCtx.restore();
 }
 /* v10.6: псевдо-3D силуэты противников, не влияющие на физику и урон. */
 let enemyDebris=[];
@@ -839,7 +846,7 @@ for(const [id,t]of towers){let[x,y]=xy(id),px=x*CELL+CELL/2,py=y*CELL+CELL/2;dra
  // No tower durability bar: towers cannot be damaged. 
  if(t.progress>0){ctx.fillStyle='rgba(9,25,30,.9)';ctx.fillRect(px-20,py-30,40,12);ctx.fillStyle='#f0dd9f';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText((t.work==='build'?'СТР':'АП')+' '+Math.ceil(t.progress)+'с',px,py-21);ctx.fillStyle='#f3c96a';ctx.fillRect(px-19,py-18,38*(1-t.progress/(t.work==='build'?BUILD_TIME:UPGRADE_TIME)),3);}
  if(selectedCell===id){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.strokeRect(x*CELL+3,y*CELL+3,CELL-6,CELL-6);}}
- drawEnemyDeathFX();drawCombatFX();
+ drawEnemyDeathFX();
  for(const m of mobs){drawEnemyBody(m);// Ледяная оболочка видна на каждой наземной цели, пока действует slow.
  if(m.slow>0 && m.kind!=='drone'){
   const cx=(m.x+.5)*CELL,cy=(m.y+.5)*CELL;
