@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Рубеж v10.3 — запуск</title>
+<style>body{background:#101b20;color:#ecf2ef;font:16px system-ui,Arial;padding:36px;max-width:720px;margin:auto}progress{width:100%;height:16px}#err{white-space:pre-wrap;color:#f9a5a5}a{color:#96d1f9}</style></head>
+<body><h2>Рубеж v10.3</h2><p id="status">Загружаем игру…</p><progress id="prog" max="25" value="0"></progress><p id="err"></p>
+<script>
+(async()=>{
+const status=document.getElementById('status'),prog=document.getElementById('prog'),err=document.getElementById('err');
+try {
+ const count=25, parts=new Array(count);
+ await Promise.all(Array.from({length:count},async (_,i)=>{
+   const file='./parts/'+String(i).padStart(3,'0')+'.txt';
+   const res=await fetch(file,{cache:'no-store'});
+   if(!res.ok) throw new Error('Не загрузился файл '+file+' (HTTP '+res.status+')');
+   parts[i]=await res.text();
+   prog.value=Number(prog.value)+1;status.textContent='Загрузка игры: '+prog.value+' / '+count;
+ }));
+ const page=parts.join('');
+ if(page.length<5000000||!page.startsWith('<!doctype html>')||!page.includes('</html>'))
+   throw new Error('Файлы игры загружены не полностью');
+ document.open();document.write(page);document.close();
+}catch(e){status.textContent='Не удалось запустить игру';err.textContent=String(e)+'. Обновите страницу (Ctrl+F5).';}
+})();
+</script></body></html>
