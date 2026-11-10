@@ -597,6 +597,21 @@ function drawAARockets(){
    for(let j=0;j<7;j++){let a=j*6.283/7;ctx.beginPath();ctx.moveTo(p.x+Math.cos(a)*r*.4,p.y+Math.sin(a)*r*.4);ctx.lineTo(p.x+Math.cos(a)*r*1.2,p.y+Math.sin(a)*r*1.2);ctx.stroke();}
    ctx.restore();
  }
+ // Вспышки оружия рисуем в верхнем слое, ПОВЕРХ WebGL-моделей.
+ // Координаты в единицах игрового мира; тот же transform, что и у ракет.
+ for(const p of muzzleFlashes){
+  const alpha=Math.max(0,p.life/p.maxLife);
+  if(alpha<=0)continue;
+  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);
+  ctx.globalAlpha=Math.min(1,alpha*1.1);
+  const length=(p.type==='gun'?24:16)*(.55+.45*alpha);
+  const width=(p.type==='gun'?8:6)*(.55+.45*alpha);
+  ctx.shadowColor='#ffbf56';ctx.shadowBlur=11;
+  ctx.fillStyle='#ffe5a0';
+  ctx.beginPath();ctx.moveTo(length,0);ctx.lineTo(2,-width);ctx.lineTo(6,0);ctx.lineTo(2,width);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#fffbea';ctx.beginPath();ctx.ellipse(4,0,5,2.5,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+ }
  ctx.restore();
 }
 
@@ -683,8 +698,11 @@ function addCombatHit(x,y,type){
  if(combatSparks.length>210)combatSparks.splice(0,combatSparks.length-210);
 }
 function addMuzzleFlash(x,y,tx,ty,type){
- const life=type==='gun'?.21:.11;
- muzzleFlashes.push({x:(x+.5)*CELL,y:(y+.5)*CELL,angle:Math.atan2(ty-y,tx-x),life,maxLife:life,type});
+ const life=type==='gun'?.26:.18;
+ const angle=Math.atan2(ty-y,tx-x);
+ // Выводим эффект у конца ствола, а не под 3D-корпусом башни.
+ const barrelOffset=type==='gun'?22:17;
+ muzzleFlashes.push({x:(x+.5)*CELL+Math.cos(angle)*barrelOffset,y:(y+.5)*CELL+Math.sin(angle)*barrelOffset-6,angle,life,maxLife:life,type});
  if(muzzleFlashes.length>80)muzzleFlashes.splice(0,muzzleFlashes.length-80);
 }
 function advanceCombatFX(dt){
@@ -698,13 +716,6 @@ function drawCombatFX(){
  for(const p of combatSparks){
   const a=Math.max(0,p.life/p.maxLife);
   ctx.globalAlpha=a*.88;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.5,1.9*a),0,Math.PI*2);ctx.fill();
- }
- for(const p of muzzleFlashes){
-  const a=Math.max(0,p.life/p.maxLife);
-  ctx.save();ctx.globalAlpha=a*.85;ctx.translate(p.x,p.y);ctx.rotate(p.angle);
-  const len=(p.type==='gun'?23:12)*a;
-  ctx.fillStyle='#ffe8a2';ctx.beginPath();ctx.moveTo(7+len,0);ctx.lineTo(7,-3.5*a);ctx.lineTo(9,0);ctx.lineTo(7,3.5*a);ctx.closePath();ctx.fill();
-  ctx.restore();
  }
  ctx.restore();
 }
