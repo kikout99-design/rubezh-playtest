@@ -815,6 +815,15 @@ cv.addEventListener('pointerleave',()=>{hoverCell=null;combatDebugCursor=null;})
 cv.addEventListener('pointermove',e=>{combatDebugCursor={x:e.clientX,y:e.clientY};});
 
 document.body.classList.toggle('developer-mode',new URLSearchParams(location.search).get('dev')==='1');
+document.body.classList.add('ui-panel-closed');
+const panelToggle=el('panelToggle');
+panelToggle.onclick=()=>{
+ const isOpen=document.body.classList.toggle('ui-panel-closed')===false;
+ panelToggle.setAttribute('aria-expanded',String(isOpen));
+ panelToggle.textContent=isOpen?'✕ Закрыть панель':'☰ Командование';
+ requestAnimationFrame(()=>{responsiveCanvas();});
+};
+
 // v10.4: неподвижный мир, перемещается только viewport камеры.
 const CAMERA_MIN=0.48,CAMERA_MAX=3.8;
 let cameraUserAdjusted=false,cameraGesture=null,suppressCanvasClick=false;
