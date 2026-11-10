@@ -734,6 +734,46 @@ function drawBattleDecor(){
  }
  ctx.restore();
 }
+/* v10.9: графические акценты статусов, попаданий и ландшафта. */
+function drawStatusVisuals(){
+ ctx.save();
+ const t=performance.now()*.001;
+ for(const m of mobs){
+  if(m.hp<=0)continue;
+  const x=(m.x+.5)*CELL,y=(m.y+.5)*CELL;
+  if(m.burn>0){
+   for(let i=0;i<3;i++){
+    const a=t*4+i*2.09+m.x,yy=y-5-i*6-(t*10+i*4)%10;
+    ctx.globalAlpha=.40+.18*Math.sin(a);
+    ctx.fillStyle=i===1?'#ffdf74':'#fc7533';
+    ctx.beginPath();ctx.ellipse(x+Math.sin(a)*5,yy,2.7,6,Math.sin(a)*.3,0,Math.PI*2);ctx.fill();
+   }
+  }
+  if(m.empStun>0){
+   ctx.globalAlpha=.75;ctx.strokeStyle='#8bdfff';ctx.lineWidth=1.8;
+   for(let i=0;i<2;i++){
+    const a=t*8+i*Math.PI,x0=x+Math.cos(a)*12,y0=y+Math.sin(a)*9;
+    ctx.beginPath();ctx.moveTo(x0-4,y0-6);ctx.lineTo(x0+1,y0-1);ctx.lineTo(x0-3,y0+5);ctx.stroke();
+   }
+  }
+ }
+ ctx.restore();
+}
+function drawLandDetail(){
+ const items=sceneProps(level),time=performance.now()*.001;
+ ctx.save();
+ for(const it of items){
+  if(it.type!=='rock'&&it.type!=='barrier')continue;
+  const x=(it.x+.5)*CELL,y=(it.y+.6)*CELL;
+  ctx.fillStyle='rgba(11,23,18,.20)';
+  ctx.beginPath();ctx.ellipse(x+5,y+8,12*it.size,4*it.size,0,0,Math.PI*2);ctx.fill();
+  if(it.type==='barrier'){
+   ctx.strokeStyle='#d2ae68';ctx.lineWidth=1.6;
+   ctx.beginPath();ctx.moveTo(x-10,y-3);ctx.lineTo(x+8,y+5);ctx.moveTo(x-10,y+5);ctx.lineTo(x+8,y-3);ctx.stroke();
+  }
+ }
+ ctx.restore();
+}
 function drawBattleSmoke(overlayCtx){
  overlayCtx.save();
  for(const p of battleSmoke){
@@ -908,7 +948,7 @@ function draw(){syncWaveControls();refreshHeroButton();const rect=cv.getBounding
  // гранями и падающими тенями. Только свободные клетки карты; коллизии не меняются.
  if(sceneryMode==="classic")drawScenery(level);
  // Превью действительных маршрутов во время подготовки.
- drawPreparationRoutes();
+ drawPreparationRoutes();drawLandDetail();
  // Маяки входов: активный или следующий маршрут, видимый ещё до начала волны.
  drawGateBeacons();
  // Установленные мины на дорожных клетках (включая обе дороги).
@@ -941,7 +981,7 @@ for(const [id,t]of towers){let[x,y]=xy(id),px=x*CELL+CELL/2,py=y*CELL+CELL/2;dra
  // No tower durability bar: towers cannot be damaged. 
  if(t.progress>0){ctx.fillStyle='rgba(9,25,30,.9)';ctx.fillRect(px-20,py-30,40,12);ctx.fillStyle='#f0dd9f';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText((t.work==='build'?'СТР':'АП')+' '+Math.ceil(t.progress)+'с',px,py-21);ctx.fillStyle='#f3c96a';ctx.fillRect(px-19,py-18,38*(1-t.progress/(t.work==='build'?BUILD_TIME:UPGRADE_TIME)),3);}
  if(selectedCell===id){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.strokeRect(x*CELL+3,y*CELL+3,CELL-6,CELL-6);}}
- drawBattleDecor();drawEnemyDeathFX();drawHQImpacts();
+ drawBattleDecor();drawEnemyDeathFX();drawHQImpacts();drawStatusVisuals();
  for(const m of mobs){drawEnemyBody(m);// Ледяная оболочка видна на каждой наземной цели, пока действует slow.
  if(m.slow>0 && m.kind!=='drone'){
   const cx=(m.x+.5)*CELL,cy=(m.y+.5)*CELL;
@@ -964,7 +1004,7 @@ for(const [id,t]of towers){let[x,y]=xy(id),px=x*CELL+CELL/2,py=y*CELL+CELL/2;dra
   ctx.beginPath();ctx.moveTo(ex-9,ey-18);ctx.lineTo(ex-3,ey-25);ctx.lineTo(ex+1,ey-18);ctx.lineTo(ex+9,ey-23);ctx.stroke();ctx.restore();
  }
  ctx.fillStyle='#e4ad69';ctx.fillRect((m.x+.5)*CELL-11,(m.y+.5)*CELL-16,22*Math.max(0,m.hp/m.maxHP),3);}
- for(const p of projectiles){ctx.strokeStyle=p.color;ctx.lineWidth=3;ctx.beginPath();if(p.empPulse){const progress=1-p.life/.55;ctx.save();ctx.globalAlpha=Math.max(.08,p.life/.55)*.85;ctx.strokeStyle='#7adcfb';ctx.lineWidth=4;ctx.shadowColor='#5de7ff';ctx.shadowBlur=14;ctx.arc((p.x+.5)*CELL,(p.y+.5)*CELL,Math.max(4,p.empPulse*CELL*progress),0,Math.PI*2);ctx.stroke();ctx.restore(); }else if(p.mineBlast){ctx.globalAlpha=Math.min(1,p.life/.22);ctx.arc((p.x+.5)*CELL,(p.y+.5)*CELL,p.mineBlast*CELL*(1-p.life/.22),0,Math.PI*2);}else if(p.flameSpray){
+ for(const p of projectiles){ctx.strokeStyle=p.color;ctx.lineWidth=3;ctx.beginPath();if(p.empPulse){const progress=1-p.life/.55;ctx.save();ctx.globalAlpha=Math.max(.08,p.life/.55)*.85;ctx.strokeStyle='#7adcfb';ctx.lineWidth=4;ctx.shadowColor='#5de7ff';ctx.shadowBlur=14;ctx.arc((p.x+.5)*CELL,(p.y+.5)*CELL,Math.max(4,p.empPulse*CELL*progress),0,Math.PI*2);ctx.stroke();ctx.restore(); }else if(p.mineBlast){ctx.globalAlpha=Math.min(1,p.life/.22);ctx.fillStyle='rgba(244,165,70,.16)';ctx.beginPath();ctx.arc((p.x+.5)*CELL,(p.y+.5)*CELL,p.mineBlast*CELL*(1-p.life/.22),0,Math.PI*2);ctx.fill();ctx.strokeStyle='#ffbd6d';ctx.lineWidth=3;ctx.beginPath();ctx.arc((p.x+.5)*CELL,(p.y+.5)*CELL,p.mineBlast*CELL*(1-p.life/.22),0,Math.PI*2);}else if(p.flameSpray){
    const sx=(p.x+.5)*CELL,sy=(p.y+.5)*CELL,ex=(p.tx+.5)*CELL,ey=(p.ty+.5)*CELL;
    ctx.save();ctx.globalAlpha=Math.min(1,p.life/.13);
    ctx.strokeStyle='#ff862c';ctx.lineWidth=9;ctx.shadowColor='#f5a437';ctx.shadowBlur=11;
