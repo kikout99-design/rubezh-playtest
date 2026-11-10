@@ -90,8 +90,9 @@ const ENEMY_TYPES={
  heavy:{name:'Тяжёлая бронетехника',mark:'Т',hp:3.25,speed:.52,damage:1.3,reward:75,color:'#6f91ac',armor:.42,empResist:.55},
  assault:{name:'Штурмовой',mark:'Ш',hp:1.5,speed:.93,damage:2.1,reward:42,color:'#e49a8c',armor:.08,frostResist:.5}
 };
-const NORMAL_DRONE_START_WAVE=4;
-const DRONE_TEST_FROM_FIRST_WAVE=true;
+const NORMAL_DRONE_START_WAVE=7;
+// Ранние дроны доступны лишь в явном режиме разработчика: ?dev=1&testDrones=1
+const DRONE_TEST_FROM_FIRST_WAVE=new URLSearchParams(location.search).get('dev')==='1'&&new URLSearchParams(location.search).get('testDrones')==='1';
 function waveComposition(n){const count=5+n*2;const result=[];for(let i=0;i<count;i++){
  let type='normal';
  if(n >= (DRONE_TEST_FROM_FIRST_WAVE ? 1 : NORMAL_DRONE_START_WAVE) && (i%8===2 || i%8===3)) type='drone';
@@ -103,7 +104,7 @@ function waveComposition(n){const count=5+n*2;const result=[];for(let i=0;i<coun
  result.push(type);
  }return result;
 }
-function waveTypes(n){if(n>TOTAL)return '—';const kinds=[...new Set(waveComposition(n))];return kinds.map(type=>ENEMY_TYPES[type].name).join(' · ');}
+function waveTypes(n){if(n>TOTAL)return 'Все волны пройдены';const counts={};for(const t of waveComposition(n))counts[t]=(counts[t]||0)+1;return Object.entries(counts).map(([t,n])=>ENEMY_TYPES[t].name+' ×'+n).join(' · ');}
 function waveInfo(n){if(n>TOTAL)return 'Все волны пройдены';const count={};for(const type of waveComposition(n))count[type]=(count[type]||0)+1;return 'Волна '+n+' · '+Object.entries(count).map(([t,v])=>ENEMY_TYPES[t].name+': '+v).join(' · ');}
 function startWave(){if(wave===0&&intermissionLeft>0){message('Первая волна начнётся через '+Math.ceil(intermissionLeft)+' сек. Выбери героя и построй оборону.');return;}if(BONUS_WAVES[wave]&&!bonusClaimed.has(wave)&&wave>0&&(pending>0||mobs.length>0)){message('Сначала отбей волну '+wave+' полностью, чтобы открыть награду за рекламу.');return;}if(bonusPending!==null){message('Сначала получи или пропусти рекламную награду за волну '+bonusPending+'.');return;}if(ended||pending>0||mobs.length>4||wave>=TOTAL)return;if(!spendReserve())return;intermissionLeft=0;intermissionWave=0;renderCountdown();wave++;spawnQueue=waveComposition(wave);spawnIndex=0;pending=spawnQueue.length;spawnTimer=0;message('Волна '+wave+' из '+TOTAL+': '+waveInfo(wave)+(wave>=4?' · Противники наступают одновременно с двух дорог':' · Пока активна первая дорога'));sync();}
 function renderCountdown(){const e=el('waveCountdown');if(!e)return;const visible=intermissionWave===wave&&intermissionLeft>0&&wave<TOTAL&&!ended;const prep=el('prepOverlay');if(prep){prep.hidden=!(wave===0&&visible);prep.classList.toggle('urgent',intermissionLeft<=5);if(!prep.hidden)el('prepSeconds').textContent=Math.ceil(intermissionLeft);}if(!visible){e.hidden=true;return;}e.hidden=false;if(wave===0){el('wave').textContent='Подготовка: '+Math.ceil(intermissionLeft)+' сек.';el('wave').disabled=true;}e.textContent=bonusPending!==null?'Бонус за волну · таймер остановлен ('+Math.ceil(intermissionLeft)+' сек.)':paused?'Пауза · до волны '+(wave+1)+': '+Math.ceil(intermissionLeft)+' сек.':'До волны '+(wave+1)+': '+Math.ceil(intermissionLeft)+' сек.';}
@@ -809,7 +810,7 @@ for(const id of ['towerMenuUpgrade','upgrade']){const button=el(id);button.addEv
 el('towerMenuUpgrade').onclick=()=>{setUpgradePreview(false);upgrade();refreshTowerMenu();};
 el('towerMenuSell').onclick=()=>{sell();hideTowerMenu();};
 function click(e){const r=cv.getBoundingClientRect(),px=(e.clientX-r.left-view.ox)/view.scale,py=(e.clientY-r.top-view.oy)/view.scale,x=Math.floor(px/CELL),y=Math.floor(py/CELL);if(!has(x,y)){closeRadial();return;}const id=k(x,y);if(towerAt(id)){closeRadial();selectedCell=towerAt(id).id;showTowerMenu(e,selectedCell);const t=towerAt(id);message(defs[t.type].name+' · уровень '+t.level+' · неуязвима'+(t.progress>0?' · '+(t.work==='build'?'строительство':'улучшение')+' '+Math.ceil(t.progress)+' сек.':''));sync();}else if(map.pads.has(id)){hideTowerMenu();openRadial(id);}else{hideTowerMenu();closeRadial();message('Выбери золотистую строительную ячейку.');}}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeRadial();hideTowerMenu();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeRadial();hideTowerMenu();if(!document.body.classList.contains('ui-panel-closed'))el('panelToggle').click();}});
 cv.addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect(),px=(e.clientX-r.left-view.ox)/view.scale,py=(e.clientY-r.top-view.oy)/view.scale,x=Math.floor(px/CELL),y=Math.floor(py/CELL);hoverCell=has(x,y)?k(x,y):null;});
 cv.addEventListener('pointerleave',()=>{hoverCell=null;combatDebugCursor=null;});
 cv.addEventListener('pointermove',e=>{combatDebugCursor={x:e.clientX,y:e.clientY};});
