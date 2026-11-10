@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Рубеж v10.9.1 — тест камеры и интерфейса</title>
+<style>body{background:#101b20;color:#ecf2ef;font:16px system-ui,Arial;padding:36px;max-width:720px;margin:auto}progress{width:100%;height:18px}#err{white-space:pre-wrap;color:#f9a5a5}small{color:#a1b5b0}</style></head>
+<body><h2>Рубеж v10.9.1 — тест</h2>
+<p id="status">Загрузка тестовой версии…</p><progress id="progress" value="0" max="25"></progress>
+<p id="err"></p><small>v10.3 и v10.4 не затронуты. Версия v10.9.1 загружается из отдельной ветки разработки.</small>
+<script>
+(async()=>{
+const status=document.getElementById('status'),progress=document.getElementById('progress'),err=document.getElementById('err');
+const base='https://raw.githubusercontent.com/kikout99-design/rubezh-playtest/refs/heads/dev/v10.9.1-visual-clarity/parts/';
+try{
+ const parts=new Array(25);
+ await Promise.all(Array.from({length:25},async(_,i)=>{
+  const name=String(i).padStart(3,'0')+'.txt';
+  const response=await fetch(base+name+'?v=1091',{cache:'no-store'});
+  if(!response.ok)throw new Error('Не удалось получить часть '+name+': HTTP '+response.status);
+  parts[i]=await response.text();progress.value=Number(progress.value)+1;
+  status.textContent='Загрузка игры: '+progress.value+' / 25';
+ }));
+ const page=parts.join('');
+ if(page.length<5000000||!page.startsWith('<!doctype html>')||!page.includes('</html>'))
+  throw new Error('Неполная сборка игры ('+page.length+' символов)');
+ document.open();document.write(page);document.close();
+}catch(e){status.textContent='Ошибка загрузки v10.9.1';err.textContent=String(e)+'\nСообщи этот текст в чат.';}
+})();
+</script></body></html>
