@@ -78,7 +78,7 @@ const UPGRADE_PRICES={
 function maxTowerLevel(t){return MAX_LEVEL;}
 function upgradeCost(t){return UPGRADE_PRICES[t.type]?.[t.level-1]??0;}
 function upgrade(){const t=towers.get(selectedCell);if(!t)return;if(t.progress>0){message('Дождись окончания строительства или улучшения');return;}if(t.level>=maxTowerLevel(t)){message('Максимальный уровень башни');return;}const cost=upgradeCost(t);if(credits<cost){message('Не хватает кредитов на улучшение: '+cost);return;}credits-=cost;t.invested+=cost;t.progress=UPGRADE_TIME;t.work='upgrade';t.timer=0;message('Улучшение до уровня '+(t.level+1)+' · '+UPGRADE_TIME+' сек. Башня не стреляет.');sync();}
-function setup(i){hideTowerMenu();heroCooldown=0;heroFlash=0;slugFlights=[];intermissionWave=0;intermissionLeft=15;renderCountdown();closeRadial();level=i;map=buildMap(i);towers=new Map();mobs=[];projectiles=[];aaVisuals=[];aaSmoke=[];aaBursts=[];aaHitCount=0;aaLostCount=0;mines=[];credits=999999999;headquarters=1000+(activePerks.has('commander')?150:0);levelRewardClaimed=false;runCharged=false;rescueUsed=false;bonusPending=null;bonusClaimed=new Set();el('bonusPanel').classList.remove('show');el('rescueModal').style.display='none';el('rewardPanel').hidden=true;wave=0;pending=0;spawnTimer=0;spawnQueue=[];spawnIndex=0;kills=0;earnedCredits=0;selectedCell=null;paused=false;ended=false;el('pause').textContent='Пауза';el('lvl1').classList.toggle('active',i===0);el('lvl2').classList.toggle('active',i===1);message('Уровень '+(i+1)+': '+levels[i].name+'. 15 секунд на выбор героя и подготовку обороны.');sync();renderCountdown();}
+function setup(i){enemyDebris=[];hideTowerMenu();heroCooldown=0;heroFlash=0;slugFlights=[];intermissionWave=0;intermissionLeft=15;renderCountdown();closeRadial();level=i;map=buildMap(i);towers=new Map();mobs=[];projectiles=[];aaVisuals=[];aaSmoke=[];aaBursts=[];aaHitCount=0;aaLostCount=0;mines=[];credits=999999999;headquarters=1000+(activePerks.has('commander')?150:0);levelRewardClaimed=false;runCharged=false;rescueUsed=false;bonusPending=null;bonusClaimed=new Set();el('bonusPanel').classList.remove('show');el('rescueModal').style.display='none';el('rewardPanel').hidden=true;wave=0;pending=0;spawnTimer=0;spawnQueue=[];spawnIndex=0;kills=0;earnedCredits=0;selectedCell=null;paused=false;ended=false;el('pause').textContent='Пауза';el('lvl1').classList.toggle('active',i===0);el('lvl2').classList.toggle('active',i===1);message('Уровень '+(i+1)+': '+levels[i].name+'. 15 секунд на выбор героя и подготовку обороны.');sync();renderCountdown();}
 function restartLevel(){const wasCharged=runCharged;if(wasCharged){updateReserve();if(reserve<=0){message('Нельзя переиграть уровень: боевой резерв исчерпан. Дождись восстановления единицы.');return;}}const current=level;setup(current);if(wasCharged){runCharged=false;if(!spendReserve()){message('Не удалось списать боевой резерв.');return;}message('Новая попытка уровня начата: списана ещё одна единица боевого резерва.');}sync();}
 function sync(){refreshTowerMenu();el('level').textContent=level+1;el('waves').textContent=wave+' / '+TOTAL;el('credits').textContent=credits;el('hp').textContent=Math.round(100*Math.max(0,headquarters)/(1000+(activePerks.has('commander')?150:0)))+'%';el('sell').disabled=!towers.has(selectedCell);const chosen=towers.get(selectedCell);el('sell').textContent=chosen?'Продать: +'+Math.round(chosen.invested*.65)+' кр.':'Продать башню';el('stats').textContent=chosen?statsText(chosen):'Выбери башню для просмотра характеристик';el('upgrade').disabled=!chosen||chosen.progress>0||chosen.level>=maxTowerLevel(chosen)||credits<upgradeCost(chosen);el('upgrade').textContent=!chosen?'Улучшить башню':chosen.progress>0?'Башня занята · '+Math.ceil(chosen.progress)+' сек.':chosen.level>=maxTowerLevel(chosen)?'Максимальный уровень ('+maxTowerLevel(chosen)+')': 'Улучшить до ур. '+(chosen.level+1)+' · '+upgradeCost(chosen)+' кр.';el('slugs').textContent=slugs;el('reserve').textContent=reserveText();renderPerks();if(el('hqModal'))refreshHQ();el('wave').disabled=(wave===0&&intermissionLeft>0)||ended||headquarters<=0||wave>=TOTAL||pending>0||mobs.length>4||bonusPending!==null||(!!BONUS_WAVES[wave]&&!bonusClaimed.has(wave)&&mobs.length>0);refreshHeroButton();el('wave').textContent=wave===0&&intermissionLeft>0?'Подготовка: '+Math.ceil(intermissionLeft)+' сек.':wave>=TOTAL?'Все 16 волн запущены':'▶ Запустить волну '+(wave+1);el('waveStripLabel').textContent=wave>=TOTAL&&pending===0?'Все волны запущены':pending>0?'Текущая волна '+wave:'Следующая волна '+Math.min(wave+1,TOTAL);el('waveStripTypes').textContent=(wave>=TOTAL&&pending===0?'—':waveTypes(pending>0?wave:Math.min(wave+1,TOTAL)))+' · '+((pending>0?wave:wave+1)>=4?'2 дороги':'1 дорога');}
 const ENEMY_TYPES={
@@ -179,8 +179,10 @@ spawnTimer=.82;}}for(const m of mobs){m.empStun=Math.max(0,(m.empStun||0)-dt);m.
  // returned a one-cell route and the enemy froze just short of the exact cell centre.
  if(id===map.goal){m.hp=-999;headquarters-=m.damage;continue;}
  let route=pathfind(id,map.goal);if(!route)continue;
+ const previousX=m.x,previousY=m.y;
  let remain=m.empStun>0?0:m.speed*(m.slow>0?(.42+.58*(m.frostResist||0)):1)*dt;
  while(remain>0&&route.length>1){const [tx,ty]=xy(route[1]);const dist=Math.hypot(tx-m.x,ty-m.y);if(dist<=remain){m.x=tx;m.y=ty;remain-=dist;route.shift();}else{m.x+=(tx-m.x)/dist*remain;m.y+=(ty-m.y)/dist*remain;remain=0;}}
+ if(Math.hypot(m.x-previousX,m.y-previousY)>.0001){m.faceX=m.x-previousX;m.faceY=m.y-previousY;}
  if(k(Math.round(m.x),Math.round(m.y))===map.goal){m.hp=-999;headquarters-=m.damage;}}
  updateMines(dt);
  updateEMP(dt);
@@ -190,7 +192,11 @@ spawnTimer=.82;}}for(const m of mobs){m.empStun=Math.max(0,(m.empStun||0)-dt);m.
   // Show the actual attack for long enough at every tower level, including III–VI.
   projectiles.push({x,y,tx:target.x,ty:target.y,life:.34,maxLife:.34,color:'#ffb15c',flameSpray:true});
  }else if(t.type==='aa'){createAARocket(x,y,target,shotDamage,t);}else{projectiles.push({x,y,tx:target.x,ty:target.y,life:.12,color:d.color});}}
- updateAARockets(dt);for(const m of mobs)if(m.hp<=0&&m.hp!==-999){kills++;const reward=m.reward||12;credits+=reward;earnedCredits+=reward;if(Math.random()<.035){const drop=15+Math.floor(Math.random()*6);slugs+=drop;saveProfile();slugFlights.push({x:(m.x+.5)*CELL,y:(m.y+.5)*CELL,amount:drop,age:0,duration:1.15});message('Редкая находка: +'+drop+' слитков');}}mobs=mobs.filter(m=>m.hp>0);projectiles=projectiles.filter(p=>(p.life-=dt)>0);if(headquarters<=0&&!rescueUsed){settleDefeat();}else if(headquarters<=0){ended=true;message('Штаб уничтожен — поражение');}else if(wave>0&&pending===0&&mobs.length===0)offerWaveBonus();if(wave===TOTAL&&pending===0&&mobs.length===0){ended=true;if(!levelRewardClaimed){levelReward=100;el('rewardPanel').hidden=false;el('rewardText').textContent='Награда за уровень: '+levelReward+' слитков';}message('Победа! Все 16 волн отбиты.');}sync();}
+ updateAARockets(dt);drawEnemyDebris(dt);for(const m of mobs)if(m.hp<=0&&m.hp!==-999){
+ const bx=(m.x+.5)*CELL,by=(m.y+.5)*CELL;
+ for(let i=0;i<7;i++){const angle=(i/7)*Math.PI*2+Math.random()*.3,velocity=14+Math.random()*32;enemyDebris.push({x:bx,y:by,vx:Math.cos(angle)*velocity,vy:Math.sin(angle)*velocity-12,life:.32+Math.random()*.25,maxLife:.57,color:m.tint});}
+ if(enemyDebris.length>250)enemyDebris.splice(0,enemyDebris.length-250);
+ kills++;const reward=m.reward||12;credits+=reward;earnedCredits+=reward;if(Math.random()<.035){const drop=15+Math.floor(Math.random()*6);slugs+=drop;saveProfile();slugFlights.push({x:(m.x+.5)*CELL,y:(m.y+.5)*CELL,amount:drop,age:0,duration:1.15});message('Редкая находка: +'+drop+' слитков');}}mobs=mobs.filter(m=>m.hp>0);projectiles=projectiles.filter(p=>(p.life-=dt)>0);if(headquarters<=0&&!rescueUsed){settleDefeat();}else if(headquarters<=0){ended=true;message('Штаб уничтожен — поражение');}else if(wave>0&&pending===0&&mobs.length===0)offerWaveBonus();if(wave===TOTAL&&pending===0&&mobs.length===0){ended=true;if(!levelRewardClaimed){levelReward=100;el('rewardPanel').hidden=false;el('rewardText').textContent='Награда за уровень: '+levelReward+' слитков';}message('Победа! Все 16 волн отбиты.');}sync();}
 function circleRange(id,radius,color,fill){const [x,y]=xy(id);ctx.beginPath();ctx.arc((x+.5)*CELL,(y+.5)*CELL,radius,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.setLineDash([7,5]);ctx.stroke();ctx.setLineDash([]);}
 function deadZoneRange(id){circleRange(id,defs.gun.minRange,'#f07878','rgba(240,90,90,.12)');}
 function highlightEngineer(id,preview=false){for(const nid of engineerNeighbors(id)){const [nx,ny]=xy(nid),occupied=!!towerAt(nid);ctx.fillStyle=occupied?'rgba(71,234,115,.34)':'rgba(77,197,245,.23)';ctx.fillRect(nx*CELL+2,ny*CELL+2,CELL-4,CELL-4);ctx.strokeStyle=occupied?'#72f99b':'#7edbfc';ctx.lineWidth=2;ctx.strokeRect(nx*CELL+3,ny*CELL+3,CELL-6,CELL-6);}}
@@ -663,6 +669,76 @@ function drawScenery(index){
  ctx.restore();
 }
 
+
+/* v10.6: псевдо-3D силуэты противников, не влияющие на физику и урон. */
+let enemyDebris=[];
+function drawEnemyBody(m){
+ const x=(m.x+.5)*CELL,y=(m.y+.5)*CELL;
+ const dir=Math.atan2(m.faceY||0,m.faceX||1);
+ const kind=m.kind||'normal';
+ const heavy=kind==='heavy',armor=heavy||kind==='armored';
+ const drone=kind==='drone',scout=kind==='scout'||kind==='sprinter';
+ const time=performance.now()*.001;
+ ctx.save();
+ // Тень фиксирует объект на дороге. У дронов тень отделена от корпуса.
+ ctx.fillStyle='rgba(7,20,23,.40)';
+ ctx.beginPath();ctx.ellipse(x,y+(drone?7:9),armor?17:drone?15:10,armor?6:4,0,0,Math.PI*2);ctx.fill();
+ ctx.translate(x,y-(drone?8:armor?4:2)+(drone?Math.sin(time*4+m.x)*2:0));
+ ctx.rotate(dir);
+ ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=1.2;
+ if(drone){
+   // Квадрокоптер с вращающимися лопастями — без изменения высоты или хитбокса.
+   ctx.strokeStyle='#394755';ctx.lineWidth=3;
+   for(const [rx,ry] of [[-11,-10],[-11,10],[11,-10],[11,10]]){
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(rx,ry);ctx.stroke();
+    ctx.fillStyle='#566875';ctx.beginPath();ctx.arc(rx,ry,4.5,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#d9d0fc';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(rx,ry,7,2.2,time*19,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='#394755';ctx.lineWidth=3;
+   }
+   ctx.fillStyle='#8b7bc1';ctx.strokeStyle='#372d50';ctx.lineWidth=1.4;
+   ctx.beginPath();ctx.moveTo(11,0);ctx.lineTo(5,-5);ctx.lineTo(-9,-5);ctx.lineTo(-12,0);ctx.lineTo(-9,5);ctx.lineTo(5,5);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.fillStyle='#a8f2ff';ctx.fillRect(5,-2,4,4);
+ }else if(armor){
+   const z=heavy?1.18:1;
+   ctx.scale(z,z);ctx.fillStyle='#26383f';ctx.strokeStyle='#192a30';ctx.lineWidth=1.3;
+   for(const side of [-1,1]){ctx.fillRect(-14,side*7-3,28,6);
+    for(let n=-1;n<=1;n++){ctx.fillStyle='#65747b';ctx.fillRect(n*8-2,side*7-2,4,4);}}
+   ctx.fillStyle=heavy?'#526c7b':'#768895';ctx.beginPath();
+   ctx.moveTo(16,0);ctx.lineTo(9,-8);ctx.lineTo(-12,-8);ctx.lineTo(-15,-3);
+   ctx.lineTo(-15,6);ctx.lineTo(8,8);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.fillStyle='#a8bbc2';ctx.beginPath();ctx.moveTo(-8,-5);ctx.lineTo(8,-5);ctx.lineTo(12,0);ctx.lineTo(5,2);ctx.lineTo(-8,2);ctx.closePath();ctx.fill();
+   ctx.fillStyle='#42545d';ctx.beginPath();ctx.ellipse(-1,0,6.5,5,0,0,Math.PI*2);ctx.fill();
+   ctx.strokeStyle='#222d34';ctx.lineWidth=heavy?4:3;ctx.beginPath();ctx.moveTo(2,0);ctx.lineTo(heavy?21:18,0);ctx.stroke();
+ }else{
+   // Разведчики и штурмовые отличаются габаритами и экипировкой.
+   const size=kind==='assault'?1.15:scout?.82:1;
+   ctx.scale(size,size);
+   ctx.fillStyle='rgba(26,45,43,.9)';ctx.fillRect(-8,-7,15,14);
+   ctx.fillStyle=kind==='assault'?'#aa705e':scout?'#c8b459':'#8b9a85';
+   ctx.strokeStyle='#344440';ctx.lineWidth=1.5;
+   ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(5,-7);ctx.lineTo(-8,-6);ctx.lineTo(-11,0);ctx.lineTo(-8,6);ctx.lineTo(5,7);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.fillStyle='#c8d0b3';ctx.beginPath();ctx.arc(1,0,3.5,0,Math.PI*2);ctx.fill();
+   ctx.strokeStyle='#273a3d';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(5,1);ctx.lineTo(15,1);ctx.stroke();
+   if(kind==='assault'){ctx.fillStyle='#5c3935';ctx.fillRect(-9,-4,6,8);}
+ }
+ ctx.restore();
+}
+function drawEnemyDebris(dt){
+ for(let i=enemyDebris.length-1;i>=0;i--){
+  const p=enemyDebris[i];p.life-=dt;
+  if(p.life<=0){enemyDebris.splice(i,1);continue;}
+  p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=dt*28;
+ }
+}
+function drawEnemyDeathFX(){
+ for(const p of enemyDebris){
+  const alpha=Math.max(0,p.life/p.maxLife);
+  ctx.fillStyle=p.color;ctx.globalAlpha=alpha*.85;
+  ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.6,2.8*alpha),0,Math.PI*2);ctx.fill();
+ }
+ ctx.globalAlpha=1;
+}
+
 function draw(){syncWaveControls();refreshHeroButton();const rect=cv.getBoundingClientRect();ctx.clearRect(0,0,rect.width,rect.height);ctx.save();ctx.translate(view.ox,view.oy);ctx.scale(view.scale,view.scale);const landscape=landscapeImages[level];const textured=showLandscape&&landscape&&landscape.complete&&landscape.naturalWidth>0;
  if(textured){ctx.drawImage(landscape,0,0,W*CELL,H*CELL);}else{ctx.fillStyle='#395a48';ctx.fillRect(0,0,W*CELL,H*CELL);}
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const id=k(x,y),px=x*CELL,py=y*CELL;
@@ -714,7 +790,8 @@ for(const [id,t]of towers){let[x,y]=xy(id),px=x*CELL+CELL/2,py=y*CELL+CELL/2;dra
  // No tower durability bar: towers cannot be damaged. 
  if(t.progress>0){ctx.fillStyle='rgba(9,25,30,.9)';ctx.fillRect(px-20,py-30,40,12);ctx.fillStyle='#f0dd9f';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText((t.work==='build'?'СТР':'АП')+' '+Math.ceil(t.progress)+'с',px,py-21);ctx.fillStyle='#f3c96a';ctx.fillRect(px-19,py-18,38*(1-t.progress/(t.work==='build'?BUILD_TIME:UPGRADE_TIME)),3);}
  if(selectedCell===id){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.strokeRect(x*CELL+3,y*CELL+3,CELL-6,CELL-6);}}
- for(const m of mobs){ctx.fillStyle=m.tint;ctx.strokeStyle='#343c36';ctx.lineWidth=2;ctx.beginPath();ctx.arc((m.x+.5)*CELL,(m.y+.5)*CELL,11,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#18282b';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText(ENEMY_TYPES[m.kind||'normal'].mark,(m.x+.5)*CELL,(m.y+.5)*CELL+4);// Ледяная оболочка видна на каждой наземной цели, пока действует slow.
+ drawEnemyDeathFX();
+ for(const m of mobs){drawEnemyBody(m);// Ледяная оболочка видна на каждой наземной цели, пока действует slow.
  if(m.slow>0 && m.kind!=='drone'){
   const cx=(m.x+.5)*CELL,cy=(m.y+.5)*CELL;
   ctx.save();
