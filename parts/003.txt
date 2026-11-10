@@ -814,21 +814,37 @@ cv.addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect(),px=(e.c
 cv.addEventListener('pointerleave',()=>{hoverCell=null;combatDebugCursor=null;});
 cv.addEventListener('pointermove',e=>{combatDebugCursor={x:e.clientX,y:e.clientY};});
 
-// Камера: колесо — масштаб относительно курсора, ЛКМ с движением — перенос,
-// короткое нажатие ЛКМ — выбор ячейки, ПКМ — отмена выбора/строительства.
-const CAMERA_MIN=0.48,CAMERA_MAX=3.8;let cameraUserAdjusted=false;
-let cameraGesture=null, suppressCanvasClick=false;
-function cellHoverAt(e){const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left-view.ox)/view.scale/CELL),y=Math.floor((e.clientY-r.top-view.oy)/view.scale/CELL);hoverCell=has(x,y)?k(x,y):null;}
+// v10.4: неподвижный мир, перемещается только viewport камеры.
+const CAMERA_MIN=0.48,CAMERA_MAX=3.8;
+let cameraUserAdjusted=false,cameraGesture=null,suppressCanvasClick=false;
+let cameraViewport={width:cv.getBoundingClientRect().width,height:cv.getBoundingClientRect().height};
+function clampCamera(){
+ const r=cv.getBoundingClientRect(),w=W*CELL*view.scale,h=H*CELL*view.scale;
+ const margin=72;
+ const axis=(value,screen,world)=>{
+  if(world<=screen)return (screen-world)/2;
+  return Math.max(screen-world-margin,Math.min(margin,value));
+ };
+ view.ox=axis(view.ox,r.width,w);view.oy=axis(view.oy,r.height,h);
+}
+function cellHoverAt(e){
+ const r=cv.getBoundingClientRect();
+ const x=Math.floor((e.clientX-r.left-view.ox)/view.scale/CELL);
+ const y=Math.floor((e.clientY-r.top-view.oy)/view.scale/CELL);
+ hoverCell=has(x,y)?k(x,y):null;
+}
+cv.style.touchAction='none';
 cv.addEventListener('wheel',e=>{
  e.preventDefault();closeRadial();
  const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
  const wx=(mx-view.ox)/view.scale,wy=(my-view.oy)/view.scale;
  const next=Math.max(CAMERA_MIN,Math.min(CAMERA_MAX,view.scale*Math.exp(-e.deltaY*.0014)));
- view.scale=next;view.ox=mx-wx*next;view.oy=my-wy*next;cameraUserAdjusted=true;
- cellHoverAt(e);
+ view.scale=next;view.ox=mx-wx*next;view.oy=my-wy*next;
+ clampCamera();cameraUserAdjusted=true;cellHoverAt(e);
 },{passive:false});
 cv.addEventListener('pointerdown',e=>{
  if(e.button!==0&&e.button!==1)return;
+ if(cameraGesture)return;
  cameraGesture={id:e.pointerId,button:e.button,startX:e.clientX,startY:e.clientY,ox:view.ox,oy:view.oy,drag:e.button===1};
  if(e.button===1)e.preventDefault();
  try{cv.setPointerCapture(e.pointerId)}catch(_){}
@@ -837,13 +853,17 @@ cv.addEventListener('pointermove',e=>{
  const g=cameraGesture;if(!g||g.id!==e.pointerId)return;
  const dx=e.clientX-g.startX,dy=e.clientY-g.startY;
  if(Math.hypot(dx,dy)>6)g.drag=true;
- if(g.drag){view.ox=g.ox+dx;view.oy=g.oy+dy;hoverCell=null;}
+ if(g.drag){
+  view.ox=g.ox+dx;view.oy=g.oy+dy;clampCamera();
+  cameraUserAdjusted=true;hoverCell=null;
+ }
 });
 cv.addEventListener('pointerup',e=>{
  const g=cameraGesture;if(!g||g.id!==e.pointerId)return;
  cameraGesture=null;
  if(g.drag){suppressCanvasClick=true;setTimeout(()=>{suppressCanvasClick=false},0)}
  else if(g.button===0){click(e);suppressCanvasClick=true;setTimeout(()=>{suppressCanvasClick=false},0)}
+ try{cv.releasePointerCapture(e.pointerId)}catch(_){}
 });
 cv.addEventListener('pointercancel',()=>{cameraGesture=null;});
 cv.addEventListener('contextmenu',e=>{
@@ -854,14 +874,15 @@ function chooseHero(id){if(wave>0){message('Выбор героя закрыт �
 el('chooseArtillery').onclick=()=>chooseHero('artillery');el('chooseAntiair').onclick=()=>chooseHero('antiair');el('heroSelect').onchange=()=>chooseHero(el('heroSelect').value);el('heroCall').onclick=callHero;el('wave').onclick=startWave;el('gateWave1').onclick=startWave;el('gateWave2').onclick=startWave;el('skipWait').onclick=()=>{if(intermissionWave===wave&&intermissionLeft>0&&wave>0)startWave();};el('sell').onclick=sell;el('upgrade').onclick=upgrade;el('pause').onclick=()=>{paused=!paused;el('pause').textContent=paused?'Продолжить':'Пауза';};el('lvl1').onclick=()=>setup(0);el('lvl2').onclick=()=>setup(1);el('restart').onclick=restartLevel;
 const arsenal=el('arsenal');for(const[id,name,cost]of TYPES){let b=document.createElement('button');b.textContent=name+' · '+cost;b.dataset.type=id;b.onclick=()=>{selectedType=id;for(const x of arsenal.children)x.classList.toggle('active',x.dataset.type===id);message('Выбрана башня: '+name+' · '+cost+' кредитов');};arsenal.appendChild(b);}arsenal.firstChild.classList.add('active');function responsiveCanvas(){
  const old={scale:view.scale,ox:view.ox,oy:view.oy};
+ const centerX=(cameraViewport.width/2-old.ox)/Math.max(.001,old.scale);
+ const centerY=(cameraViewport.height/2-old.oy)/Math.max(.001,old.scale);
  canvasSize();
+ const r=cv.getBoundingClientRect();
  if(cameraUserAdjusted&&old.scale>0){
-   // Keep previous world center when changing browser size.
-   const r=cv.getBoundingClientRect();
-   view.scale=old.scale;
-   view.ox=Math.min(Math.max(old.ox,r.width-W*CELL*view.scale+28),r.width-28);
-   view.oy=Math.min(Math.max(old.oy,r.height-H*CELL*view.scale+28),r.height-28);
+  view.scale=old.scale;view.ox=r.width/2-centerX*view.scale;
+  view.oy=r.height/2-centerY*view.scale;clampCamera();
  }
+ cameraViewport={width:r.width,height:r.height};
  if(towerMenuAnchor)fitTowerMenu(towerMenuAnchor.x,towerMenuAnchor.y);
 }
 window.addEventListener('resize',responsiveCanvas);
