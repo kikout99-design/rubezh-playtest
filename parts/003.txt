@@ -603,7 +603,10 @@ function drawAARockets(){
  for(const p of muzzleFlashes){
   const alpha=Math.max(0,p.life/p.maxLife);
   if(alpha<=0)continue;
-  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.angle);
+  const owner=towers.get(p.ownerId);
+  // Follow live 3D turret anchor, not the 2D target vector.
+  const tip=owner&&owner.visualMuzzle;
+  ctx.save();ctx.translate(tip?.x??p.x,tip?.y??p.y);ctx.rotate(tip?.angle??p.angle);
   ctx.globalAlpha=Math.min(1,alpha*1.1);
   const length=(p.type==='gun'?24:16)*(.55+.45*alpha);
   const width=(p.type==='gun'?8:6)*(.55+.45*alpha);
@@ -705,7 +708,7 @@ function addMuzzleFlash(x,y,tx,ty,type){
  const barrelOffset=type==='gun'?24:18;
  // У 3D-модели основание находится в центре клетки, а оружие поднято над ним.
  const turretHeight=type==='gun'?38:32;
- muzzleFlashes.push({x:(x+.5)*CELL+Math.cos(angle)*barrelOffset,y:(y+.5)*CELL+Math.sin(angle)*barrelOffset-turretHeight,angle,life,maxLife:life,type});
+ muzzleFlashes.push({ownerId:k(x,y),x:(x+.5)*CELL+Math.cos(angle)*barrelOffset,y:(y+.5)*CELL+Math.sin(angle)*barrelOffset-turretHeight,angle,life,maxLife:life,type});
  if(muzzleFlashes.length>80)muzzleFlashes.splice(0,muzzleFlashes.length-80);
 }
 function advanceCombatFX(dt){
