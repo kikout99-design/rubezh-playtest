@@ -11,7 +11,7 @@ const status=document.getElementById('status'),progress=document.getElementById(
 const base='https://raw.githubusercontent.com/kikout99-design/rubezh-playtest/refs/heads/dev/v10.4-camera-ui/parts/';
 try{
  const parts=new Array(25);
- await Promise.all(parts.map(async(_,i)=>{
+ await Promise.all(Array.from({length:25},async(_,i)=>{
   const name=String(i).padStart(3,'0')+'.txt';
   const response=await fetch(base+name+'?v=104',{cache:'no-store'});
   if(!response.ok)throw new Error('Не удалось получить часть '+name+': HTTP '+response.status);
