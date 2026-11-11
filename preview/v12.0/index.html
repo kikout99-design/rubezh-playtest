@@ -302,7 +302,9 @@ for(const e of sceneryAssets){
   obj.scale.setScalar(scale);obj.position.set(-center.x*scale,-box.min.y*scale-.08,-center.z*scale);
   obj.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
   visual.add(obj);visual.position.set(e.x,0,e.z);scene.add(visual);
-  cc0Loaded++;cc0Statuses.set(e.name,'OK');renderCC0();
+  cc0Loaded++;cc0Statuses.set(e.name,'OK');
+  if(cc0Loaded>=5)hqFortifications.visible=false; // Replace older boxed guard posts and warehouses with genuine CC0 assets.
+  renderCC0();
  },undefined,err=>{cc0Failed++;cc0Statuses.set(e.name,'ошибка '+((err&&err.message)||'загрузки').slice(0,60));renderCC0();});
 }
 renderCC0();
