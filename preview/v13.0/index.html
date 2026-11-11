@@ -788,27 +788,32 @@ new GLTFLoader().load(enemyAssetUrl,gltf=>{
 },undefined,()=>{enemyModels.tank=null;});
 function enemyMesh(kind){
  const g=new THREE.Group();
- if(enemyModels.tank&&kind!=='drone'){
+ if(enemyModels.tank&&!['drone','bomber','transport'].includes(kind)){
   g.add(enemyModels.tank.clone(true));
  }else{
-  const m=new THREE.Mesh(kind==='drone'?new THREE.OctahedronGeometry(.55):enemyGeometry,enemyMaterial);
-  m.position.y=kind==='drone'?2:.5;m.castShadow=true;g.add(m);
+  const m=new THREE.Mesh(['drone','bomber','transport'].includes(kind)?new THREE.OctahedronGeometry(kind==='bomber'?1.3:kind==='transport'?1.1:.55):enemyGeometry,enemyMaterial);
+  m.position.y=['drone','bomber','transport'].includes(kind)?2:.5;m.castShadow=true;g.add(m);
  }
  return g;
 }
-const enemyKinds=['vehicle','scout','heavy','drone'];
+// Air roles enter later waves; temporary geometry is explicitly a preview asset.
+const enemyKinds=['vehicle','scout','heavy','drone','transport','bomber'];
 function spawnEnemy(){
  const wave=gameControl.wave;
- const kind=wave>=7&&gameControl.spawnQueue%6===0?'drone':wave>=5&&gameControl.spawnQueue%4===0?'heavy':gameControl.spawnQueue%3===0?'scout':'vehicle';
+ const kind=wave>=12&&gameControl.spawnQueue%13===0?'bomber':
+ wave>=9&&gameControl.spawnQueue%11===0?'transport':
+ wave>=7&&gameControl.spawnQueue%6===0?'drone':
+ wave>=5&&gameControl.spawnQueue%4===0?'heavy':
+ gameControl.spawnQueue%3===0?'scout':'vehicle';
  const lane=(wave>=4&&gameControl.spawnQueue%2===0)?1:0;
  const curve=lane?secondaryCurve:roadCurve;
- const maxHp=(kind==='heavy'?220:kind==='scout'?55:kind==='drone'?60:110)*(1+(wave-1)*.23);
- const enemy={kind,lane,curve,progress:0,speed:(kind==='scout'?.022:kind==='heavy'?.009:kind==='drone'?.028:.014),hp:maxHp,maxHp,slow:0,stun:0,burn:0,model:enemyMesh(kind),dead:false};
+ const maxHp=(kind==='heavy'?220:kind==='scout'?55:kind==='drone'?60:kind==='transport'?155:kind==='bomber'?270:110)*(1+(wave-1)*.23);
+ const enemy={kind,lane,curve,progress:0,speed:(kind==='scout'?.022:kind==='heavy'?.009:kind==='drone'?.028:kind==='transport'?.018:kind==='bomber'?.019:.014),hp:maxHp,maxHp,slow:0,stun:0,burn:0,model:enemyMesh(kind),dead:false};
  game.add(enemy.model);gameEnemies.push(enemy);updateEnemyPosition(enemy);
 }
 function updateEnemyPosition(e){
  const p=e.curve.getPointAt(Math.min(.999,e.progress)),d=e.curve.getTangentAt(Math.min(.999,e.progress));
- e.model.position.set(p.x,e.kind==='drone'?1.5:0,p.z);
+ e.model.position.set(p.x,['drone','bomber','transport'].includes(e.kind)?2.2:0,p.z);
  e.model.rotation.y=Math.atan2(-d.z,d.x);
 }
 const fxMat=new THREE.MeshBasicMaterial({color:0xffb34d,transparent:true,opacity:.9,depthWrite:false});
@@ -843,7 +848,7 @@ function gameTick(dt){
   if(e.burn)hurtEnemy(e,dt*4,'flame');
   if(!e.stun)e.progress+=e.speed*dt*(e.slow?.55:1);
   if(e.progress>=1){
-   gameControl.hq=Math.max(0,gameControl.hq-(e.kind==='heavy'?12:5));
+   gameControl.hq=Math.max(0,gameControl.hq-(e.kind==='heavy'?12:e.kind==='bomber'?20:e.kind==='transport'?8:5));
    game.remove(e.model);gameEnemies.splice(i,1);
    if(gameControl.hq<=0)gameControl.gameOver=true;
   }else updateEnemyPosition(e);
@@ -851,7 +856,7 @@ function gameTick(dt){
  for(const t of gameTowers){
   if(t.type.kind==='radar')continue;
   t.timer-=dt;if(t.timer>0)continue;
-  const nearby=gameEnemies.filter(e=>!e.dead&&(t.type.kind!=='rocket'||e.kind==='drone')&&e.model.position.distanceTo(t.model.g.position)<=t.range+(gameTowers.some(r=>r.type.kind==='radar'&&r.model.g.position.distanceTo(t.model.g.position)<r.range)?1.0:0));
+  const nearby=gameEnemies.filter(e=>!e.dead&&(t.type.kind!=='rocket'||['drone','bomber','transport'].includes(e.kind))&&e.model.position.distanceTo(t.model.g.position)<=t.range+(gameTowers.some(r=>r.type.kind==='radar'&&r.model.g.position.distanceTo(t.model.g.position)<r.range)?1.0:0));
   if(!nearby.length)continue;
   const enemy=nearby.sort((a,b)=>b.progress-a.progress)[0];
   const dx=enemy.model.position.x-t.model.g.position.x,dz=enemy.model.position.z-t.model.g.position.z;
@@ -906,6 +911,9 @@ document.getElementById('gameSpeed').onclick=()=>{
 function gameMode(active){
  gameControl.playing=active;game.visible=active;secondaryRoad.visible=active&&gameControl.wave>=4;
  document.getElementById('gameUI').style.display=active?'block':'none';
+ // Original graphics-prototype actors must not overlap playable game enemies.
+ tower.visible=!active;tankRoot.visible=!active;car.visible=!active;heavy.visible=!active;
+ contactGroup.visible=!active;
  document.querySelector('.panel').style.display=active?'none':'block';
  document.getElementById('legend').style.display=active?'none':'block';
  moving=!active;combatEnabled=!active;targetMarker.visible=!active;
