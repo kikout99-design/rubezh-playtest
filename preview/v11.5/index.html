@@ -136,6 +136,31 @@ new GLTFLoader().load(url,gltf=>{
  const rot=new THREE.Group();rot.add(obj);setTank(rot);
  state.textContent='GLB загружен: танк Quaternius, лицензия CC0';state.style.color='#a9ecba';
 },undefined,error=>{state.textContent='GLB не загрузился — показана временная модель';state.style.color='#ffbda8';console.warn('External GLB failure',error)});
+// Distinct roadside checkpoints, direction boards and fortifications kept off the convoy lane.
+const roadside=new THREE.Group();scene.add(roadside);
+const poleMat=mat(0x313e37,.9,.35),signMat=mat(0xc3b890,.9);
+function sign(x,z,number){
+ const origin=new THREE.Vector3(x,0,z);
+ const post=new THREE.Mesh(new THREE.CylinderGeometry(.06,.08,1.5,8),poleMat);
+ post.position.set(x,.67,z);post.castShadow=true;roadside.add(post);
+ const signFace=new THREE.Mesh(new THREE.BoxGeometry(1.08,.56,.10),signMat);
+ signFace.position.set(x,1.40,z);signFace.castShadow=true;roadside.add(signFace);
+ const can=document.createElement('canvas');can.width=128;can.height=64;const c=can.getContext('2d');
+ c.fillStyle='#d8cfaa';c.fillRect(0,0,128,64);c.strokeStyle='#3f5544';c.lineWidth=8;c.strokeRect(3,3,122,58);
+ c.fillStyle='#263e35';c.font='bold 38px sans-serif';c.textAlign='center';c.fillText(number,64,46);
+ const tex=new THREE.CanvasTexture(can);tex.colorSpace=THREE.SRGBColorSpace;
+ const face=new THREE.Mesh(new THREE.PlaneGeometry(1.04,.54),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
+ face.position.set(x,1.40,z+.056);roadside.add(face);
+}
+for(const [x,z,n] of [[-15,-1.4,'01'],[-4,1.4,'02'],[9,5.7,'03']])sign(x,z,n);
+function concreteBarrier(x,z,yaw=0){
+ const g=new THREE.Group();g.position.set(x,-.10,z);g.rotation.y=yaw;
+ const part=new THREE.Mesh(new THREE.BoxGeometry(1.45,.68,.62),mat(0x7e857a));part.position.y=.34;part.castShadow=true;part.receiveShadow=true;g.add(part);
+ const top=new THREE.Mesh(new THREE.BoxGeometry(1.25,.13,.68),mat(0x5b665c));top.position.y=.68;top.castShadow=true;g.add(top);
+ roadside.add(g);
+}
+for(let i=0;i<4;i++){concreteBarrier(2.3+i*.95,5.7,.08);concreteBarrier(10.2+i*.95,7.9,-.08);}
+
 const tower=new THREE.Group();tower.position.set(2.3,.0,3.8);scene.add(tower);
 const defensePad=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.85,.32,12),mat(0x6f7367));
 defensePad.position.set(2.3,-.05,3.8);defensePad.receiveShadow=true;scene.add(defensePad);
@@ -381,7 +406,16 @@ function advanceBattleEffects(dt){
  hudTick=0;
  }
 }
-let autoRotate=true,moving=true,night=false,offset=0,forward=true,last=performance.now();
+let autoRotate=true,moving=true,night=false,last=performance.now();
+let lastFrameDt=0;
+const homeCamera=new THREE.Vector3(18,21,24);
+const homeTarget=new THREE.Vector3(0,0,0);
+const focusOffset=new THREE.Vector3(12,16,16);
+const speeds=[.5,1,2],speedLabels=['0.5×','1×','2×'];
+let speedIndex=1;
+document.getElementById('speed').onclick=()=>{speedIndex=(speedIndex+1)%speeds.length;simSpeed=speeds[speedIndex];document.getElementById('speed').textContent='Скорость: '+speedLabels[speedIndex];};
+document.getElementById('focus').onclick=()=>{focusMode=!focusMode;autoRotate=false;document.getElementById('rotate').textContent='Поворот камеры: выкл';document.getElementById('focus').textContent='Камера: '+(focusMode?'конвой':'обзор');};
+
 let fpsFrames=0,fpsElapsed=0;
 function updateFrameDiagnostics(dt){
  fpsFrames++;fpsElapsed+=dt;
@@ -394,13 +428,41 @@ function updateFrameDiagnostics(dt){
 document.getElementById('rotate').onclick=()=>{autoRotate=!autoRotate;document.getElementById('rotate').textContent='Поворот камеры: '+(autoRotate?'вкл':'выкл')};
 document.getElementById('move').onclick=()=>{moving=!moving;document.getElementById('move').textContent='Конвой: '+(moving?'движение':'стоп')};
 document.getElementById('light').onclick=()=>{night=!night;sun.intensity=night?1.25:3.5;hemi.intensity=night?.65:1.25;scene.background.setHex(night?0x303b47:0xaeb6a8);scene.fog.color.copy(scene.background);renderer.toneMappingExposure=night?.78:1.08};
-document.getElementById('reset').onclick=()=>{offset=0;forward=true;camera.position.set(18,21,24);orbit.target.set(0,0,0);orbit.update()};
-function draw(now){requestAnimationFrame(draw);const dt=Math.min(.06,(now-last)/1000);last=now;
- if(autoRotate){const p=camera.position.clone().sub(orbit.target),a=dt*.055;camera.position.set(orbit.target.x+p.x*Math.cos(a)-p.z*Math.sin(a),camera.position.y,orbit.target.z+p.x*Math.sin(a)+p.z*Math.cos(a))}
- if(moving){advanceBattle(dt,now)}updateFrameDiagnostics(dt)
+document.getElementById('reset').onclick=()=>{
+ simulationTime=0;attackTimer=.5;shotsFired=0;hitsRegistered=0;simSpeed=1;speedIndex=1;
+ document.getElementById('speed').textContent='Скорость: 1×';
+ focusMode=false;autoRotate=false;
+ document.getElementById('focus').textContent='Камера: обзор';
+ document.getElementById('rotate').textContent='Поворот камеры: выкл';
+ for(const group of [visualShots,visualExplosions,visualSmoke,impactMarks]){
+  for(const p of group){scene.remove(p.mesh);p.mesh.material.dispose();if(![visualExplosions,visualSmoke].includes(group))p.mesh.geometry.dispose();}
+  group.length=0;
+ }
+ travelAt(.005,tankRoot);travelAt(.31,car);travelAt(.61,heavy);
+ camera.position.copy(homeCamera);orbit.target.copy(homeTarget);orbit.update();
+ document.getElementById('battleStatus').textContent='Конвой: 3 · выстрелы: 0 · попадания: 0';
+};
+function draw(now){
+ requestAnimationFrame(draw);
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ const step=dt*simSpeed;
+ if(autoRotate&&!focusMode){
+  const p=camera.position.clone().sub(orbit.target),a=dt*.055;
+  camera.position.set(orbit.target.x+p.x*Math.cos(a)-p.z*Math.sin(a),camera.position.y,orbit.target.z+p.x*Math.sin(a)+p.z*Math.cos(a));
+ }
+ if(moving){advanceBattle(step);advanceBattleEffects(step);}
+ if(focusMode){
+  const focus=tankRoot.position.clone();focus.y=0;
+  const desired=focus.clone().add(focusOffset);
+  camera.position.lerp(desired,Math.min(1,dt*1.2));
+  orbit.target.lerp(focus,Math.min(1,dt*1.2));
+ }
+ updateFrameDiagnostics(dt);
  if(heavy.userData.turret)heavy.userData.turret.rotation.y=Math.sin(now*.0004)*.32;
- // Car is now positioned by road traversal.
  muzzleGlow.visible=!loadedCount&&Math.sin(now*.014)>0.97;
- orbit.update();const aspect=innerWidth/innerHeight;camera.left=-12*aspect;camera.right=12*aspect;camera.top=12;camera.bottom=-12;camera.updateProjectionMatrix();renderer.render(scene,camera)}
+ orbit.update();
+ const aspect=innerWidth/innerHeight;camera.left=-12*aspect;camera.right=12*aspect;camera.top=12;camera.bottom=-12;camera.updateProjectionMatrix();
+ renderer.render(scene,camera);
+}
 requestAnimationFrame(draw);addEventListener('resize',()=>renderer.setSize(innerWidth,innerHeight));
 </script></body></html>
