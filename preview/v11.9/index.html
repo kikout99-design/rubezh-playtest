@@ -1,0 +1,46 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Рубеж v11.9 — сравнение моделей</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#202b26;color:#edf5eb;font:14px system-ui,Arial}#view{position:fixed;inset:0}.panel{position:fixed;z-index:2;left:16px;top:16px;width:min(380px,calc(100vw - 32px));max-height:85vh;overflow:auto;background:#14251fe8;border:1px solid #759783;border-radius:12px;padding:15px;box-shadow:0 12px 32px #0008}h1{font-size:19px;margin:0 0 9px}p{line-height:1.5;color:#ccddce}#status{font-size:12px;white-space:pre-wrap;line-height:1.7;color:#cce6d4}button{padding:9px;margin:3px;background:#36644d;border:1px solid #9cbea1;color:white;border-radius:6px;font-weight:600;cursor:pointer}#foot{position:fixed;bottom:12px;left:16px;background:#14251fe0;border-radius:8px;padding:10px;z-index:2;font-size:12px}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head><body><div id="view"></div><div class="panel"><h1>РУБЕЖ v11.9 — лаборатория GLB</h1><p>Три модели из подтверждённых бесплатных источников и одна проверенная CC0 зенитная установка. Без коробок и подмены ошибочных файлов заглушками. Число треугольников показывает геометрию, а не гарантирует хороший внешний вид.</p><div id="status">Загрузка…</div><p id="fps">FPS: —</p><button id="all">Все модели</button><button id="m0">1 · Quaternius</button><button id="m1">2 · Танк</button><button id="m2">3 · ПВО</button><button id="m3">4 · Пулемёт</button><button id="turn">Вращение: выкл</button><button id="wire">Каркас: выкл</button><button id="labels">Подписи: вкл</button><p>Средний танк и пулемёт Polyfork — бесплатные версии без HD. Зенитная установка — проверенный CC0 набор 3DAssets.dev, потому что орудие Polyfork требует покупки. Старая сцена и игровая логика не изменены.</p></div><div id="foot">Мышь — вращение · колесо — приближение · ПКМ — перемещение</div>
+<script type="module">
+import * as THREE from 'three';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xb7c0b4);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.7));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;document.getElementById('view').appendChild(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,150);camera.position.set(16,14,25);
+const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(0,1,0);orbit.enableDamping=true;orbit.minDistance=3;orbit.maxDistance=90;
+scene.add(new THREE.HemisphereLight(0xe6f0ff,0x5c654f,1.8));
+const sun=new THREE.DirectionalLight(0xffe3c0,3.1);sun.position.set(-10,22,12);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-27;sun.shadow.camera.right=27;sun.shadow.camera.top=25;sun.shadow.camera.bottom=-25;scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x899584,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const grid=new THREE.GridHelper(80,80,0x607565,0x778b79);grid.position.y=.012;scene.add(grid);
+const sources=[
+ {name:'Танк Quaternius',url:'https://raw.githubusercontent.com/tourzhao/Tanks3D/main/resources/models/tank_basic.glb',x:-13,max:4.4},
+ {name:'Средний танк Polyfork',url:'https://polyfork.dev/cdn/medium-tank-65da6b.glb',x:-4.3,max:4.4},
+ {name:'Зенитное орудие 3DAssets CC0',url:'https://cdn.3dassets.dev/assets/23683/v1/model.glb',x:4.3,max:3.0},
+ {name:'Пулемёт Polyfork',url:'https://polyfork.dev/cdn/tripod-machine-gun-80f906.glb',x:13,max:2.2}
+];
+const hosts=[],states=sources.map(()=> 'ЗАГРУЗКА'),status=document.getElementById('status');
+function display(){status.textContent=sources.map((src,i)=>(i+1)+'. '+src.name+'\n   '+states[i]).join('\n')}
+const labels=[];function sign(src,i){const cv=document.createElement('canvas');cv.width=512;cv.height=90;const c=cv.getContext('2d');c.fillStyle='#192f26';c.fillRect(0,0,512,90);c.fillStyle='#f0f6ec';c.font='bold 26px sans-serif';c.textAlign='center';c.fillText((i+1)+'. '+src.name,256,55);const tx=new THREE.CanvasTexture(cv);tx.colorSpace=THREE.SRGBColorSpace;const m=new THREE.Mesh(new THREE.PlaneGeometry(5.4,.95),new THREE.MeshBasicMaterial({map:tx,side:THREE.DoubleSide}));m.position.set(src.x,.6,4.5);scene.add(m);labels.push(m);}
+for(let i=0;i<sources.length;i++){const src=sources[i],g=new THREE.Group();g.position.x=src.x;scene.add(g);hosts.push(g);const pad=new THREE.Mesh(new THREE.CylinderGeometry(3.15,3.25,.16,40),new THREE.MeshStandardMaterial({color:0x68766b,roughness:.95}));pad.position.set(src.x,-.07,0);pad.receiveShadow=true;scene.add(pad);sign(src,i)}
+display();
+const loader=new GLTFLoader();
+for(let i=0;i<sources.length;i++){const src=sources[i];loader.load(src.url,gltf=>{const obj=gltf.scene;obj.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(obj),size=bb.getSize(new THREE.Vector3()),center=bb.getCenter(new THREE.Vector3()),scale=src.max/Math.max(size.x,size.z,.01);obj.scale.setScalar(scale);obj.position.set(-center.x*scale,-bb.min.y*scale+.02,-center.z*scale);obj.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true}});hosts[i].add(obj);let meshes=0,triangles=0;obj.traverse(n=>{if(n.isMesh){meshes++;const g=n.geometry;triangles+=Math.floor((g.index?g.index.count:g.attributes.position?.count||0)/3)}});states[i]='OK · '+meshes+' мешей · '+triangles.toLocaleString('ru-RU')+' треугольников · '+size.x.toFixed(1)+'×'+size.y.toFixed(1)+'×'+size.z.toFixed(1)+' м (исходный)';display()},undefined,e=>{states[i]='ОШИБКА · '+(e?.message||String(e)).slice(0,100);display()})}
+function home(){camera.position.set(16,14,25);orbit.target.set(0,1,0);orbit.update()}document.getElementById('all').onclick=home;
+sources.forEach((s,i)=>document.getElementById('m'+i).onclick=()=>{orbit.target.set(s.x,1,0);camera.position.set(s.x+4.3,3.5,7.6);orbit.update()});
+let rotate=false,wire=false,showLabels=true;
+document.getElementById('turn').onclick=()=>{rotate=!rotate;document.getElementById('turn').textContent='Вращение: '+(rotate?'вкл':'выкл')};
+document.getElementById('wire').onclick=()=>{
+ wire=!wire;
+ for(const host of hosts)host.traverse(o=>{if(o.isMesh){if(!o.userData.originalMaterial)o.userData.originalMaterial=o.material;
+   if(wire){o.userData.wireMaterial=new THREE.MeshBasicMaterial({color:0x28453a,wireframe:true,side:THREE.DoubleSide});o.material=o.userData.wireMaterial;}
+   else{o.material=o.userData.originalMaterial;o.userData.wireMaterial?.dispose();o.userData.wireMaterial=null;}
+ }});
+ document.getElementById('wire').textContent='Каркас: '+(wire?'вкл':'выкл');
+};
+document.getElementById('labels').onclick=()=>{
+ showLabels=!showLabels;for(const label of labels)label.visible=showLabels;
+ document.getElementById('labels').textContent='Подписи: '+(showLabels?'вкл':'выкл');
+};
+let last=performance.now(),counter=0,seconds=0;function draw(now){requestAnimationFrame(draw);const dt=Math.min(.1,(now-last)/1000);last=now;if(rotate)for(const h of hosts)h.rotation.y+=dt*.3;orbit.update();renderer.render(scene,camera);seconds+=dt;counter++;if(seconds>1){document.getElementById('fps').textContent='FPS: '+Math.round(counter/seconds);counter=0;seconds=0}}requestAnimationFrame(draw);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script></body></html>
