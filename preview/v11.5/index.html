@@ -429,13 +429,16 @@ document.getElementById('rotate').onclick=()=>{autoRotate=!autoRotate;document.g
 document.getElementById('move').onclick=()=>{moving=!moving;document.getElementById('move').textContent='Конвой: '+(moving?'движение':'стоп')};
 document.getElementById('light').onclick=()=>{night=!night;sun.intensity=night?1.25:3.5;hemi.intensity=night?.65:1.25;scene.background.setHex(night?0x303b47:0xaeb6a8);scene.fog.color.copy(scene.background);renderer.toneMappingExposure=night?.78:1.08};
 document.getElementById('reset').onclick=()=>{
- simulationTime=0;attackTimer=.5;shotsFired=0;hitsRegistered=0;simSpeed=1;speedIndex=1;
+ simulationTime=0;attackTimer=.5;currentAim=0;shotsFired=0;hitsRegistered=0;simSpeed=1;speedIndex=1;
  document.getElementById('speed').textContent='Скорость: 1×';
  focusMode=false;autoRotate=false;
  document.getElementById('focus').textContent='Камера: обзор';
  document.getElementById('rotate').textContent='Поворот камеры: выкл';
  for(const group of [visualShots,visualExplosions,visualSmoke,impactMarks]){
-  for(const p of group){scene.remove(p.mesh);p.mesh.material.dispose();if(![visualExplosions,visualSmoke].includes(group))p.mesh.geometry.dispose();}
+  for(const p of group){scene.remove(p.mesh);p.mesh.material.dispose();
+   // Tracer, explosion and smoke shapes are shared; impact circles own unique geometry.
+   if(group===impactMarks)p.mesh.geometry.dispose();
+  }
   group.length=0;
  }
  travelAt(.005,tankRoot);travelAt(.31,car);travelAt(.61,heavy);
@@ -451,6 +454,8 @@ function draw(now){
   camera.position.set(orbit.target.x+p.x*Math.cos(a)-p.z*Math.sin(a),camera.position.y,orbit.target.z+p.x*Math.sin(a)+p.z*Math.cos(a));
  }
  if(moving){advanceBattle(step);advanceBattleEffects(step);}
+ // First frame starts with convoy positioned on its actual route.
+ if(!moving)targetMarker.material.opacity=0;
  if(focusMode){
   const focus=tankRoot.position.clone();focus.y=0;
   const desired=focus.clone().add(focusOffset);
