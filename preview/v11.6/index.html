@@ -142,11 +142,13 @@ for(let i=0;i<100;i++){
  const x=(rng()-.5)*38,z=(rng()-.5)*26;if(roadDistance(x,z)<3.75||(x>6&&x<16&&z>3&&z<12))continue;
  let m=mesh(new THREE.ConeGeometry(.16+rng()*.16,.25+rng()*.32,4),rng()>.5?olive:shoulder,x,.02,z,false);m.rotation.y=rng()*3;
 }
+/* v11.6: unified earthy military art palette, applied consistently across props. */
+const environmentPalette={foliage:0x3e5541,shrubs:0x65754d,concrete:0x777b74,roof:0x43554f,storage:0x64736b};
 /* v11.6: environment group, fixed positions, shared geometry to stay browser-friendly. */
 const landscapeDetail=new THREE.Group();scene.add(landscapeDetail);
 const pineTrunkGeo=new THREE.CylinderGeometry(.13,.20,1.55,6),
  pineCrownGeo=new THREE.ConeGeometry(.96,2.5,7),shrubGeo=new THREE.IcosahedronGeometry(.5,0);
-const pineTrunkMat=mat(0x665541),pineLeafMat=mat(0x3e5541),shrubMat=mat(0x65754d);
+const pineTrunkMat=mat(0x665541),pineLeafMat=mat(environmentPalette.foliage),shrubMat=mat(environmentPalette.shrubs);
 function addLandscapeMesh(g,m,x,y,z,scale=1){
  const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.scale.setScalar(scale);
  o.castShadow=true;o.receiveShadow=true;landscapeDetail.add(o);return o;
@@ -268,7 +270,7 @@ place(hq,new THREE.CylinderGeometry(.06,.06,1.4,8),steel,1.3,4.22,-.80);
 for(const x of [7,8.2,9.4,10.6,11.8,13]){const box=place(details,new THREE.BoxGeometry(.78,.52,.55),sand,x,.09,10.1);box.rotation.y=.15;}
 for(const z of [3,4,5])place(details,new THREE.BoxGeometry(.82,.85,.82),sand,14,.30,z);
 /* v11.6: headquarters perimeter, guard positions and modular warehouses. */
-const concreteEdge=mat(0x777b74),metalRoof=mat(0x43554f,.72,.18);
+const concreteEdge=mat(environmentPalette.concrete),metalRoof=mat(environmentPalette.roof,.72,.18);
 for(const [x,z,r] of [[6.6,8.8,.16],[8.0,11.9,0],[10.0,12.1,0],[12.0,12.0,0],[13.7,8.7,-.15]]){
  const piece=place(hqFortifications,new THREE.BoxGeometry(1.48,.82,.56),concreteEdge,x,.23,z);piece.rotation.y=r;
 }
@@ -282,7 +284,7 @@ function guardPost(x,z){
  }
 }
 guardPost(6.6,11.3);guardPost(14.6,11.6);
-const warehouseMat=mat(0x64736b,.87,.08),warehouseRoof=mat(0x354844,.76,.17);
+const warehouseMat=mat(environmentPalette.storage,.87,.08),warehouseRoof=mat(0x354844,.76,.17);
 function warehouse(x,z,yaw,w=3.4,d=2.5){
  const g=new THREE.Group();g.position.set(x,-.10,z);g.rotation.y=yaw;hqFortifications.add(g);
  place(g,new THREE.BoxGeometry(w,1.75,d),warehouseMat,0,.90,0);
