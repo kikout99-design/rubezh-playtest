@@ -101,7 +101,7 @@ for(const [hx,hz,r,height] of [[-15,5,4.2,.85],[-2,8,4.1,.9],[4,-10,4.7,.65],[16
  for(let j=0;j<=steps;j++)for(let i=0;i<=divisions;i++){
   const angle=i*Math.PI*2/divisions,t=j/steps,dist=t*r,px=hx+Math.cos(angle)*dist,pz=hz+Math.sin(angle)*dist;
   v.push(px,-.17+height*(1-t*t)*(1-t*t),pz);
-  if(j<steps&&i<divisions){const a=j*(divisions+1)+i,b=a+divisions+1;idx.push(a,b,a+1,a+1,b,b+1);}
+  if(j<steps&&i<divisions){const a=j*(divisions+1)+i,b=a+divisions+1;idx.push(a,a+1,b,a+1,b+1,b);}
  }
  const geom=new THREE.BufferGeometry();geom.setAttribute('position',new THREE.Float32BufferAttribute(v,3));geom.setIndex(idx);geom.computeVertexNormals();
  const mound=new THREE.Mesh(geom,hills);mound.receiveShadow=true;scene.add(mound);
