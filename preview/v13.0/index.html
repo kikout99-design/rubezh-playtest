@@ -669,6 +669,30 @@ for(let i=0;i<buildPositions.length;i++){
  node.position.set(x,-.065,z);node.receiveShadow=true;
  node.userData.padIndex=i;game.add(node);buildPads.push(node);
 }
+// Reuse the known-working real military GLBs for the three matching tower families.
+const turretAssetConfigs={mg:23682,heavy:23682,aa:23683,radar:23685};
+const turretAssetCache={};const turretAssetStatus={};
+for(const [kind,assetId] of Object.entries(turretAssetConfigs)){
+ turretAssetStatus[kind]='ЗАГРУЗКА';
+ new GLTFLoader().load('https://cdn.3dassets.dev/assets/'+assetId+'/v1/model.glb',gltf=>{
+  const template=gltf.scene;template.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(template),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
+  const factor=2.1/Math.max(size.x,size.z,.01);
+  template.scale.setScalar(factor);template.position.set(-center.x*factor,-box.min.y*factor,-center.z*factor);
+  template.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}});
+  turretAssetCache[kind]=template;turretAssetStatus[kind]='OK';
+  for(const t of gameTowers)if(t.type.id===kind)replaceTowerVisual(t);
+ },undefined,()=>{turretAssetStatus[kind]='ОШИБКА';});
+}
+function replaceTowerVisual(tw){
+ const template=turretAssetCache[tw.type.id];
+ if(!template)return;
+ if(tw.model.visual)tw.model.g.remove(tw.model.visual);
+ tw.model.base.visible=false;tw.model.top.visible=false;
+ const clone=template.clone(true);
+ clone.position.y+=.05;tw.model.g.add(clone);
+ tw.model.visual=clone;
+}
 const commonBodyGeo=new THREE.CylinderGeometry(.58,.75,.72,10);
 const commonBaseMat=new THREE.MeshStandardMaterial({color:0x4c6051,metalness:.18,roughness:.75});
 const tubeGeo=new THREE.CylinderGeometry(.12,.15,1.65,10);
@@ -717,7 +741,7 @@ function addTower(pad){
  game.add(model.g);
  const tw={type:t,level:1,model,base:pad,timer:0,range:t.range,damage:t.damage};
  pad.userData.tower=tw;pad.material=padTaken;
- gameTowers.push(tw);
+ gameTowers.push(tw);replaceTowerVisual(tw);
  gameControl.selectedTower=tw;
  updateSelected();
 }
@@ -831,7 +855,7 @@ function gameTick(dt){
   if(!nearby.length)continue;
   const enemy=nearby.sort((a,b)=>b.progress-a.progress)[0];
   const dx=enemy.model.position.x-t.model.g.position.x,dz=enemy.model.position.z-t.model.g.position.z;
-  t.model.top.rotation.y=Math.atan2(-dz,dx);
+  t.model.top.rotation.y=Math.atan2(-dz,dx);if(t.model.visual)t.model.visual.rotation.y=Math.atan2(-dz,dx);
   const origin=t.model.g.position.clone().add(new THREE.Vector3(0,1.05,0)),target=enemy.model.position.clone().add(new THREE.Vector3(0,.65,0));
   visualEffect(origin,target,t.type.kind);
   if(t.type.kind==='mines'){
@@ -862,7 +886,7 @@ function refreshStats(){
  'Штаб: '+gameControl.hq.toFixed(0)+'% · Волна: '+gameControl.wave+
  ' · Кредиты: '+Math.floor(gameControl.credits).toLocaleString('ru-RU')+
  ' · На поле: '+gameEnemies.filter(e=>!e.dead).length+
- ' · Башни: '+gameTowers.length+' · Уничтожено: '+gameControl.kills+
+ ' · Башни: '+gameTowers.length+' · Уничтожено: '+gameControl.kills+' · GLB башен: '+Object.values(turretAssetStatus).filter(x=>x==='OK').length+'/4'+
  (gameControl.gameOver?' · ПОРАЖЕНИЕ':gameControl.preparing?' · ГОТОВ К ВОЛНЕ':'');
  document.getElementById('startWave').disabled=!gameControl.preparing||gameControl.gameOver;
 }
