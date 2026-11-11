@@ -13,7 +13,7 @@ button{background:#37594c;border:1px solid #829c87;border-radius:7px;color:white
 <body><div id="view"></div>
 <div class="panel"><h1>РУБЕЖ · v11.4 / графический прототип</h1>
 <p>БОЕВАЯ 3D-сцена: извилистая дорога, рельеф, движущаяся техника, стрельба, взрывы, укрепления и GLB-модели. Основная игра не изменена.</p>
-<p>Готовые модели: <span id="state">загрузка…</span><p id="loadSummary" style="font-size:11px">0/0 моделей</p></p>
+<p>Готовые модели: <span id="state">загрузка…</span><p id="loadSummary" style="font-size:11px">0/0 моделей</p><p id="perf" style="font-size:11px">FPS: — · графика: ожидание</p></p>
 <div class="controls"><button id="rotate">Поворот камеры: вкл</button><button id="move">Конвой: движение</button><button id="light">Время суток</button><button id="detail">Детали: вкл</button><button id="combat">Бой: вкл</button><button id="reset">Сброс</button></div>
 </div><div id="legend">Мышь: колесо — масштаб · перетаскивание — поворот · GLB Quaternius + 3DAssets.dev, CC0; новые военные модели статичные</div>
 <script type="module">
@@ -314,8 +314,10 @@ function advanceBattle(dt,now){
   attackTimer-=dt;explosionTimer-=dt;
   if(attackTimer<=0){
     attackTimer=.48;
-    const from=new THREE.Vector3(tower.position.x,tower.position.y+1.65,tower.position.z);
     const to=new THREE.Vector3(heavy.position.x,heavy.position.y+1.1,heavy.position.z);
+    const direction=new THREE.Vector3().subVectors(to,tower.position);direction.y=0;direction.normalize();
+    // Muzzle position follows aiming direction rather than originating at the tower pivot.
+    const from=new THREE.Vector3(tower.position.x+direction.x*.9,tower.position.y+1.65,tower.position.z+direction.z*.9);
     spawnTracer(from,to);
     if(explosionTimer<=0){createBlast(to,true);explosionTimer=4;}
   }
@@ -336,13 +338,22 @@ function advanceBattle(dt,now){
 }
 
 let autoRotate=true,moving=true,night=false,offset=0,forward=true,last=performance.now();
+let fpsFrames=0,fpsElapsed=0;
+function updateFrameDiagnostics(dt){
+ fpsFrames++;fpsElapsed+=dt;
+ if(fpsElapsed>=1){
+  const fps=Math.round(fpsFrames/fpsElapsed);
+  document.getElementById('perf').textContent='FPS: '+fps+' · GLB: '+loadedCount+'/9 · эффекты: '+(visualShots.length+visualExplosions.length+visualSmoke.length);
+  fpsFrames=0;fpsElapsed=0;
+ }
+}
 document.getElementById('rotate').onclick=()=>{autoRotate=!autoRotate;document.getElementById('rotate').textContent='Поворот камеры: '+(autoRotate?'вкл':'выкл')};
 document.getElementById('move').onclick=()=>{moving=!moving;document.getElementById('move').textContent='Конвой: '+(moving?'движение':'стоп')};
 document.getElementById('light').onclick=()=>{night=!night;sun.intensity=night?1.25:3.5;hemi.intensity=night?.65:1.25;scene.background.setHex(night?0x303b47:0xaeb6a8);scene.fog.color.copy(scene.background);renderer.toneMappingExposure=night?.78:1.08};
 document.getElementById('reset').onclick=()=>{offset=0;forward=true;camera.position.set(18,21,24);orbit.target.set(0,0,0);orbit.update()};
 function draw(now){requestAnimationFrame(draw);const dt=Math.min(.06,(now-last)/1000);last=now;
  if(autoRotate){const p=camera.position.clone().sub(orbit.target),a=dt*.055;camera.position.set(orbit.target.x+p.x*Math.cos(a)-p.z*Math.sin(a),camera.position.y,orbit.target.z+p.x*Math.sin(a)+p.z*Math.cos(a))}
- if(moving){advanceBattle(dt,now)}
+ if(moving){advanceBattle(dt,now)}updateFrameDiagnostics(dt)
  if(heavy.userData.turret)heavy.userData.turret.rotation.y=Math.sin(now*.0004)*.32;
  // Car is now positioned by road traversal.
  muzzleGlow.visible=!loadedCount&&Math.sin(now*.014)>0.97;
