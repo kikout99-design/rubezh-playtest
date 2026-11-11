@@ -19,7 +19,7 @@ button{background:#37594c;border:1px solid #829c87;border-radius:7px;color:white
 <h2 style="margin:2px 0 8px;font-size:18px">РУБЕЖ 3D — игровой тест</h2>
 <div id="gameStats" style="font-size:13px;line-height:1.7">Подготовка…</div>
 <div style="display:flex;gap:5px;flex-wrap:wrap;margin:8px 0">
-<button id="startWave">Начать волну</button><button id="pauseWave">Пауза</button><button id="gameSpeed">Скорость ×1</button><button id="closeGame">Демо-сцена</button></div>
+<button id="startWave">Начать волну</button><button id="skipPrep">Пропустить ожидание</button><button id="pauseWave">Пауза</button><button id="gameSpeed">Скорость ×1</button><button id="closeGame">Демо-сцена</button></div>
 <div style="font-size:12px;margin:6px 0">Выбери башню, затем нажми на зелёный круг строительства на карте:</div>
 <div id="towerButtons" style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px"></div>
 <div id="selectedTower" style="font-size:12px;margin-top:8px;color:#c9e4cc">Башня не выбрана</div>
@@ -635,7 +635,7 @@ const gameTypes=[
 ];
 const game=new THREE.Group();scene.add(game);game.visible=false;
 const gameEnemies=[],gameTowers=[],gameShots=[],gameFx=[],buildPads=[];
-const gameControl={playing:false,paused:false,wave:0,preparing:true,credits:999999,hq:100,spawnQueue:0,spawnClock:0,enemyLife:0,speed:1,selectedType:0,selectedTower:null,kills:0,gameOver:false};
+const gameControl={playing:false,paused:false,wave:0,preparing:true,credits:999999,hq:100,spawnQueue:0,spawnClock:0,prepTime:15,enemyLife:0,speed:1,selectedType:0,selectedTower:null,kills:0,gameOver:false};
 const secondaryCurve=new THREE.CatmullRomCurve3([
  new THREE.Vector3(-21,0,8),new THREE.Vector3(-13,0,5),
  new THREE.Vector3(-8,0,3),new THREE.Vector3(-3,0,1.1),
@@ -838,6 +838,7 @@ function hurtEnemy(e,damage,kind){
 function gameTick(dt){
  if(!gameControl.playing||gameControl.paused||gameControl.gameOver)return;
  dt*=gameControl.speed;
+ if(gameControl.preparing&&gameControl.prepTime>0)gameControl.prepTime=Math.max(0,gameControl.prepTime-dt);
  if(gameControl.spawnQueue>0){
   gameControl.spawnClock-=dt;
   if(gameControl.spawnClock<=0){spawnEnemy();gameControl.spawnQueue--;gameControl.spawnClock=Math.max(.38,1.35-gameControl.wave*.045);}
@@ -882,7 +883,7 @@ function gameTick(dt){
   if(a>=1){game.remove(f.mesh);f.mesh.material.dispose();gameFx.splice(i,1);}
  }
  if(gameControl.wave>0&&!gameControl.spawnQueue&&!gameEnemies.length){
-  gameControl.preparing=true;
+  gameControl.preparing=true;gameControl.prepTime=7;
  }
  refreshStats();
 }
@@ -892,13 +893,18 @@ function refreshStats(){
  ' · Кредиты: '+Math.floor(gameControl.credits).toLocaleString('ru-RU')+
  ' · На поле: '+gameEnemies.filter(e=>!e.dead).length+
  ' · Башни: '+gameTowers.length+' · Уничтожено: '+gameControl.kills+' · GLB башен: '+Object.values(turretAssetStatus).filter(x=>x==='OK').length+'/4'+
- (gameControl.gameOver?' · ПОРАЖЕНИЕ':gameControl.preparing?' · ГОТОВ К ВОЛНЕ':'');
- document.getElementById('startWave').disabled=!gameControl.preparing||gameControl.gameOver;
+ (gameControl.gameOver?' · ПОРАЖЕНИЕ':gameControl.preparing?(gameControl.prepTime>0?' · Подготовка: '+Math.ceil(gameControl.prepTime)+' с':' · ГОТОВ К ВОЛНЕ'):'');
+ document.getElementById('startWave').disabled=!gameControl.preparing||gameControl.gameOver||gameControl.prepTime>0;
 }
 document.getElementById('startWave').onclick=()=>{
- if(!gameControl.preparing||gameControl.gameOver)return;
+ if(!gameControl.preparing||gameControl.gameOver||gameControl.prepTime>0)return;
  gameControl.wave++;gameControl.spawnQueue=7+gameControl.wave*3;gameControl.spawnClock=.8;gameControl.preparing=false;
  secondaryRoad.visible=gameControl.wave>=4;refreshStats();
+};
+document.getElementById('skipPrep').onclick=()=>{
+ if(gameControl.preparing&&gameEnemies.filter(e=>!e.dead).length<=4){
+  gameControl.prepTime=0;refreshStats();
+ }
 };
 document.getElementById('pauseWave').onclick=()=>{
  gameControl.paused=!gameControl.paused;
