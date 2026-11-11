@@ -21,14 +21,14 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 const state=document.getElementById('state'),root=document.getElementById('view');
-const scene=new THREE.Scene();scene.background=new THREE.Color(0xaeb6a8);scene.fog=new THREE.Fog(0xaeb6a8,35,78);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xb8c3b6);scene.fog=new THREE.Fog(0xb8c3b6,42,95);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;root.appendChild(renderer.domElement);
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.10;root.appendChild(renderer.domElement);
 const camera=new THREE.OrthographicCamera(-14,14,8,-8,.1,90);camera.position.set(18,21,24);camera.lookAt(0,0,0);
 const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(0,0,0);orbit.enableDamping=true;orbit.maxPolarAngle=1.3;orbit.minDistance=9;orbit.maxDistance=48;
-const hemi=new THREE.HemisphereLight(0xdfe3dc,0x55594d,1.18);scene.add(hemi);
-const sun=new THREE.DirectionalLight(0xffdfb0,3.25);sun.position.set(-12,19,10);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-24;sun.shadow.camera.right=24;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;sun.shadow.normalBias=.008;sun.shadow.bias=-.00008;scene.add(sun);
+const hemi=new THREE.HemisphereLight(0xe3e9e0,0x69715f,1.44);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffe3c8,2.85);sun.position.set(-12,19,10);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-24;sun.shadow.camera.right=24;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;sun.shadow.normalBias=.012;sun.shadow.radius=2.5;sun.shadow.bias=-.00008;scene.add(sun);
 // Soft ambient fill makes the darker side of metal and concrete legible.
 const fillLight=new THREE.DirectionalLight(0xa8bdcf,.42);
 fillLight.position.set(10,8,-12);scene.add(fillLight);
@@ -189,9 +189,9 @@ for(let i=0;i<54;i++){
  o.scale.y*=.55;
 }
 function crate(x,z){const m=mesh(new THREE.BoxGeometry(.88,.75,.88),sand,x,.25,z);const trim=mesh(new THREE.BoxGeometry(.97,.08,.97),steel,x,.64,z);return m}
-for(let i=0;i<6;i++)crate(5+i*.91,5);
+// Placeholder crates from the old procedural demo are deliberately not placed.
 function sandbag(x,z){const m=mesh(new THREE.CapsuleGeometry(.22,.65,4,7),sand,x,.15,z);m.rotation.z=Math.PI/2;return m}
-for(let i=0;i<9;i++)sandbag(-3+i*.6,4.3);
+// Placeholder sandbags replaced by CC0 barricade asset.
 function fallbackTank(){
  const g=new THREE.Group();const hull=new THREE.Mesh(new THREE.BoxGeometry(2.15,.65,1.25),olive);hull.position.y=.7;g.add(hull);
  for(const side of [-.72,.72]){const tr=new THREE.Mesh(new THREE.BoxGeometry(2.25,.54,.36),steel);tr.position.set(0,.45,side);g.add(tr);
@@ -291,21 +291,21 @@ for(const x of [-1.35,1.35])place(hq,new THREE.BoxGeometry(.73,.63,.09),hqGlass,
 for(const x of [-1.7,1.7])for(const z of [-1.25,1.25])place(hq,new THREE.BoxGeometry(.4,2.7,.43),steel,x,1.43,z);
 const towerHq=place(hq,new THREE.CylinderGeometry(.55,.78,1.2,8),steel,1.30,3.13,-.80);
 place(hq,new THREE.CylinderGeometry(.06,.06,1.4,8),steel,1.3,4.22,-.80);
-for(const x of [7,8.2,9.4,10.6,11.8,13]){const box=place(details,new THREE.BoxGeometry(.78,.52,.55),sand,x,.09,10.1);box.rotation.y=.15;}
-for(const z of [3,4,5])place(details,new THREE.BoxGeometry(.82,.85,.82),sand,14,.30,z);
+// Old box-only perimeter decorations removed; CC0 meshes provide replacement detail.
+// Old cube-only storage decorations removed.
 /* v12.1: authentic CC0 battlefield scenery. The objects are actual GLB files
  from dhb118/opentop / public/assets/vendor/poly-pizza. Source attribution:
  https://github.com/dhb118/opentop/blob/main/public/assets/ATTRIBUTION.md
  Fallback placeholders are NOT created for these files. */
 const cc0Base='https://raw.githubusercontent.com/dhb118/opentop/main/public/assets/vendor/poly-pizza/';
 const sceneryAssets=[
- {name:'Вышка Quaternius',file:'quaternius-guard-tower/quaternius-guard-tower.glb',x:14.2,z:12.2,max:3.4,yaw:.17},
- {name:'Траншея Quaternius',file:'quaternius-sack-trench/quaternius-sack-trench.glb',x:3.2,z:8.1,max:4.2,yaw:.16},
- {name:'Мешки Quaternius',file:'quaternius-bags/quaternius-bags.glb',x:8.2,z:12.3,max:2.1,yaw:0},
- {name:'Ящики Quaternius',file:'quaternius-cube-crate/quaternius-cube-crate.glb',x:13.6,z:6.3,max:2.15,yaw:.25},
- {name:'Бочки Quaternius',file:'quaternius-barrel/quaternius-barrel.glb',x:-6.9,z:10.8,max:2.0,yaw:-.15},
- {name:'Забор Kenney',file:'kenney-fence-fortified/kenney-fence-fortified.glb',x:11.3,z:13.1,max:4.0,yaw:0},
- {name:'Мост Quaternius',file:'quaternius-small-bridge/quaternius-small-bridge.glb',x:-15.4,z:-6.1,max:5.2,yaw:.11}
+ {name:'Вышка Quaternius',file:'quaternius-guard-tower/quaternius-guard-tower.glb',x:15.3,z:12.5,max:2.25,yaw:.17},
+ {name:'Траншея Quaternius',file:'quaternius-sack-trench/quaternius-sack-trench.glb',x:1.2,z:8.2,max:3.7,yaw:-.10},
+ {name:'Мешки Quaternius',file:'quaternius-bags/quaternius-bags.glb',x:8.1,z:11.8,max:1.35,yaw:0},
+ {name:'Ящики Quaternius',file:'quaternius-cube-crate/quaternius-cube-crate.glb',x:13.7,z:9.5,max:1.35,yaw:.25},
+ {name:'Бочки Quaternius',file:'quaternius-barrel/quaternius-barrel.glb',x:-9.2,z:9.8,max:1.15,yaw:-.15},
+ {name:'Забор Kenney',file:'kenney-fence-fortified/kenney-fence-fortified.glb',x:10.3,z:13.4,max:3.1,yaw:.08},
+ {name:'Второй забор Kenney',file:'kenney-fence-fortified/kenney-fence-fortified.glb',x:13.8,z:13.3,max:3.1,yaw:.08}
 ];
 let cc0Loaded=0,cc0Failed=0;const cc0Statuses=new Map();
 const cc0Panel=document.getElementById('sceneAssets');
@@ -322,12 +322,14 @@ for(const e of sceneryAssets){
   const obj=gltf.scene;obj.updateMatrixWorld(true);
   const box=new THREE.Box3().setFromObject(obj),dim=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
   const maxDim=Math.max(dim.x,dim.z,.0001),scale=e.max/maxDim;
+  if(!Number.isFinite(scale)||dim.x<=0||dim.z<=0){cc0Failed++;cc0Statuses.set(e.name,'ошибка размеров');renderCC0();return;}
+  if(roadDistance(e.x,e.z)<3.5){cc0Failed++;cc0Statuses.set(e.name,'вблизи дороги — отклонён');renderCC0();return;}
   const visual=new THREE.Group();visual.rotation.y=e.yaw;
-  obj.scale.setScalar(scale);obj.position.set(-center.x*scale,-box.min.y*scale-.08,-center.z*scale);
+  obj.scale.setScalar(scale);obj.position.set(-center.x*scale,-box.min.y*scale-.10,-center.z*scale);
   obj.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
   visual.add(obj);visual.position.set(e.x,0,e.z);scene.add(visual);
   cc0Loaded++;cc0Statuses.set(e.name,'OK');
-  if(cc0Loaded>=5)hqFortifications.visible=false; // Replace older boxed guard posts and warehouses with genuine CC0 assets.
+  if(cc0Loaded>=4)hqFortifications.visible=false; // Remove box-shaped procedural defenses only once real GLBs are available.
   renderCC0();
  },undefined,err=>{cc0Failed++;cc0Statuses.set(e.name,'ошибка '+((err&&err.message)||'загрузки').slice(0,60));renderCC0();});
 }
@@ -628,7 +630,7 @@ function updateFrameDiagnostics(dt){
 }
 document.getElementById('rotate').onclick=()=>{autoRotate=!autoRotate;document.getElementById('rotate').textContent='Поворот камеры: '+(autoRotate?'вкл':'выкл')};
 document.getElementById('move').onclick=()=>{moving=!moving;document.getElementById('move').textContent='Конвой: '+(moving?'движение':'стоп')};
-document.getElementById('light').onclick=()=>{night=!night;sun.intensity=night?1.25:3.5;hemi.intensity=night?.65:1.25;scene.background.setHex(night?0x303b47:0xaeb6a8);scene.fog.color.copy(scene.background);renderer.toneMappingExposure=night?.80:1.12};
+document.getElementById('light').onclick=()=>{night=!night;sun.intensity=night?1.15:2.85;hemi.intensity=night?.8:1.44;scene.background.setHex(night?0x303b47:0xb8c3b6);scene.fog.color.copy(scene.background);renderer.toneMappingExposure=night?.82:1.10};
 document.getElementById('reset').onclick=()=>{
  simulationTime=0;attackTimer=.5;currentAim=0;shotsFired=0;hitsRegistered=0;simSpeed=1;speedIndex=1;
  document.getElementById('speed').textContent='Скорость: 1×';
