@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Рубеж v11.5 — детализированная военная сцена</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101b1b;color:#e7ece4;font:14px system-ui,Arial}#view{position:fixed;inset:0}
+.panel{position:fixed;z-index:2;left:18px;top:15px;padding:16px 18px;max-width:420px;background:#14231fdf;border:1px solid #5c786c;border-radius:13px;box-shadow:0 10px 30px #0008}
+h1{font-size:19px;margin:0 0 6px}p{margin:6px 0;line-height:1.5;color:#c1d1c6}.controls{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+button{background:#37594c;border:1px solid #829c87;border-radius:7px;color:white;padding:9px 12px;cursor:pointer;font-weight:600}button:hover{background:#47745d}
+#state{color:#f4db9a;font-weight:600}#legend{position:fixed;bottom:15px;left:18px;z-index:2;background:#14231fce;padding:8px 11px;border-radius:8px;color:#d0dccf}
+@media(max-width:650px){.panel{left:8px;right:8px;top:8px;padding:10px}.panel p{font-size:11px}#legend{font-size:11px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script></head>
+<body><div id="view"></div>
+<div class="panel"><h1>РУБЕЖ · v11.5 / графический прототип</h1>
+<p>БОЕВАЯ 3D-сцена: конвой по маршруту, прицеливание, летящие снаряды, попадания, следы взрывов, укрепления и управление скоростью. Основная игра не изменена.</p>
+<p>Готовые модели: <span id="state">загрузка…</span><p id="loadSummary" style="font-size:11px">0/0 моделей</p><p id="perf" style="font-size:11px">FPS: — · графика: ожидание</p><p id="battleStatus" style="font-size:11px">Конвой: 0 · выстрелы: 0 · попадания: 0</p></p>
+<div class="controls"><button id="rotate">Поворот камеры: вкл</button><button id="move">Конвой: движение</button><button id="light">Время суток</button><button id="detail">Детали: вкл</button><button id="combat">Бой: вкл</button><button id="speed">Скорость: 1×</button><button id="focus">Камера: обзор</button><button id="reset">Сброс</button></div>
+</div><div id="legend">Мышь: колесо — масштаб · перетаскивание — поворот · GLB Quaternius + 3DAssets.dev, CC0; новые военные модели статичные</div>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const state=document.getElementById('state'),root=document.getElementById('view');
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xaeb6a8);scene.fog=new THREE.Fog(0xaeb6a8,38,86);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;root.appendChild(renderer.domElement);
+const camera=new THREE.OrthographicCamera(-14,14,8,-8,.1,90);camera.position.set(18,21,24);camera.lookAt(0,0,0);
+const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(0,0,0);orbit.enableDamping=true;orbit.maxPolarAngle=1.3;orbit.minDistance=9;orbit.maxDistance=48;
+const hemi=new THREE.HemisphereLight(0xdfe7e8,0x4a5043,1.25);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffe5c0,3.5);sun.position.set(-10,20,12);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-24;sun.shadow.camera.right=24;sun.shadow.camera.top=24;sun.shadow.camera.bottom=-24;sun.shadow.normalBias=.012;sun.shadow.bias=-.00008;scene.add(sun);
+const mat=(c,r=1,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+function makeTerrainTexture(kind){
+ const c=document.createElement('canvas');c.width=c.height=512;const context=c.getContext('2d');
+ let seed=kind==='ground'?48546:kind==='road'?81101:90132;
+ function rand(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
+ const base=kind==='ground'?[99,101,76]:kind==='road'?[116,99,75]:[83,77,63];
+ context.fillStyle='rgb('+base.join(',')+')';context.fillRect(0,0,512,512);
+ for(let i=0;i<14000;i++){
+  const x=rand()*512,y=rand()*512,r=rand()*3+.3,d=(rand()-.5)*45;
+  context.fillStyle='rgba('+(base.map(v=>Math.max(0,Math.min(255,Math.round(v+d)))).join(','))+','+(.08+rand()*.32)+')';
+  context.beginPath();context.ellipse(x,y,r,r*(.3+rand()),rand()*3.14,0,Math.PI*2);context.fill();
+ }
+ if(kind==='road')for(let i=0;i<140;i++){
+  const x=rand()*512,y=rand()*512;context.strokeStyle='rgba(55,50,39,.19)';context.lineWidth=1+rand()*3;
+  context.beginPath();context.moveTo(x,y);context.lineTo(x+8+rand()*38,y+3+rand()*15);context.stroke();
+ }
+ const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(kind==='ground'?30:1,kind==='ground'?30:1);t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+const soil=new THREE.MeshStandardMaterial({map:makeTerrainTexture('ground'),roughness:1});
+const road=new THREE.MeshStandardMaterial({map:makeTerrainTexture('road'),roughness:.98});
+const shoulder=new THREE.MeshStandardMaterial({map:makeTerrainTexture('shoulder'),roughness:1});
+const track=mat(0x615b4d),olive=mat(0x4d614d,.82,.17),steel=mat(0x343c37,.68,.32),sand=mat(0xaaa07b),rock=mat(0x85857b),dark=mat(0x2d3733,.86,.18);
+function mesh(geo,m,x,y,z,cast=true){const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=cast;o.receiveShadow=true;scene.add(o);return o}
+mesh(new THREE.BoxGeometry(120,.75,120),soil,0,-.55,0,false);
+const roadControl=[[-21,-7],[-15,-5.8],[-10,-6.8],[-5,-4.2],[0,-2.6],[5,-.5],[10,-.1],[16,2.8],[22,4.4]];
+const roadCurve=new THREE.CatmullRomCurve3(roadControl.map(p=>new THREE.Vector3(p[0],0,p[1])),false,'centripetal');
+const roadPts=roadCurve.getPoints(90).map(p=>[p.x,p.z]);
+function roadDistance(x,z){
+ let best=Infinity;
+ for(let j=1;j<roadPts.length;j++){const a=roadPts[j-1],b=roadPts[j],dx=b[0]-a[0],dz=b[1]-a[1];
+  const v=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));
+  best=Math.min(best,Math.hypot(x-a[0]-v*dx,z-a[1]-v*dz));}
+ return best;
+}
+function stripe(points,width,height,material){
+ const verts=[];const indices=[];const uvs=[];let distanceAlong=0;
+ for(let i=0;i<points.length;i++){
+ const a=points[Math.max(0,i-1)],b=points[Math.min(points.length-1,i+1)];const dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1;
+ verts.push(points[i][0]-dy/l*width/2,height,points[i][1]+dx/l*width/2);
+ verts.push(points[i][0]+dy/l*width/2,height,points[i][1]-dx/l*width/2);
+ if(i>0)distanceAlong+=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);
+ uvs.push(0,distanceAlong/4,1,distanceAlong/4);
+ if(i<points.length-1){const v=i*2;
+   // Face winding up (+Y), not down: this fixes the disappearing road.
+   indices.push(v,v+2,v+1,v+1,v+2,v+3);
+ }
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setIndex(indices);g.computeVertexNormals();
+ const m=new THREE.Mesh(g,material);m.receiveShadow=true;scene.add(m);return m;
+}
+stripe(roadPts,6.3,-.14,shoulder);stripe(roadPts,5.0,-.105,road);
+for(const off of [-1.32,1.32]){
+ const pts=roadPts.map(([x,z],i)=>{
+ const a=roadPts[Math.max(0,i-1)],b=roadPts[Math.min(roadPts.length-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],d=Math.hypot(dx,dz)||1;
+ return [x-dz/d*off,z+dx/d*off]});
+ stripe(pts,.14,-.082,track);
+}
+const vergeMat=mat(0x665c45,.99);
+for(const off of [-2.9,2.9]){
+ const pts=roadPts.map(([x,z],i)=>{
+ const a=roadPts[Math.max(0,i-1)],b=roadPts[Math.min(roadPts.length-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],d=Math.hypot(dx,dz)||1;
+ return [x-dz/d*off,z+dx/d*off]});
+ stripe(pts,.22,-.111,vergeMat);
+}
+let seed=46;function rng(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
+// Shallow sculpted mounds placed outside the route (never collide with the road).
+const hills=mat(0x62694f,.99);
+for(const [hx,hz,r,height] of [[-15,5,4.2,.85],[-2,8,4.1,.9],[4,-10,4.7,.65],[16,-8,4.2,.6],[-14,-13,3.1,.52]]){
+ const divisions=20,steps=5,v=[],idx=[];
+ for(let j=0;j<=steps;j++)for(let i=0;i<=divisions;i++){
+  const angle=i*Math.PI*2/divisions,t=j/steps,dist=t*r,px=hx+Math.cos(angle)*dist,pz=hz+Math.sin(angle)*dist;
+  v.push(px,-.17+height*(1-t*t)*(1-t*t),pz);
+  if(j<steps&&i<divisions){const a=j*(divisions+1)+i,b=a+divisions+1;idx.push(a,a+1,b,a+1,b+1,b);}
+ }
+ const geom=new THREE.BufferGeometry();geom.setAttribute('position',new THREE.Float32BufferAttribute(v,3));geom.setIndex(idx);geom.computeVertexNormals();
+ const mound=new THREE.Mesh(geom,hills);mound.receiveShadow=true;scene.add(mound);
+}
+const boulderGeo=[new THREE.DodecahedronGeometry(1,0),new THREE.IcosahedronGeometry(1,0)];
+for(let i=0;i<82;i++){
+ const x=(rng()-.5)*37,z=(rng()-.5)*25;if(roadDistance(x,z)<4.0||(x>6&&x<16&&z>3&&z<12))continue;
+ const scale=.17+rng()*.65;const o=mesh(boulderGeo[Math.floor(rng()*2)],rng()>.45?rock:sand,x,-.05,z);o.scale.set(scale,scale*(.4+rng()*.6),scale*.85);o.rotation.y=rng()*6.28;
+}
+for(let i=0;i<100;i++){
+ const x=(rng()-.5)*38,z=(rng()-.5)*26;if(roadDistance(x,z)<3.75||(x>6&&x<16&&z>3&&z<12))continue;
+ let m=mesh(new THREE.ConeGeometry(.16+rng()*.16,.25+rng()*.32,4),rng()>.5?olive:shoulder,x,.02,z,false);m.rotation.y=rng()*3;
+}
+function crate(x,z){const m=mesh(new THREE.BoxGeometry(.88,.75,.88),sand,x,.25,z);const trim=mesh(new THREE.BoxGeometry(.97,.08,.97),steel,x,.64,z);return m}
+for(let i=0;i<6;i++)crate(5+i*.91,5);
+function sandbag(x,z){const m=mesh(new THREE.CapsuleGeometry(.22,.65,4,7),sand,x,.15,z);m.rotation.z=Math.PI/2;return m}
+for(let i=0;i<9;i++)sandbag(-3+i*.6,4.3);
+function fallbackTank(){
+ const g=new THREE.Group();const hull=new THREE.Mesh(new THREE.BoxGeometry(2.15,.65,1.25),olive);hull.position.y=.7;g.add(hull);
+ for(const side of [-.72,.72]){const tr=new THREE.Mesh(new THREE.BoxGeometry(2.25,.54,.36),steel);tr.position.set(0,.45,side);g.add(tr);
+ for(let i=-1;i<=1;i++){const w=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.08,12),dark);w.rotation.x=Math.PI/2;w.position.set(i*.7,.43,side*1.22);g.add(w)}}
+ const turret=new THREE.Group();turret.position.y=1.2;const dome=new THREE.Mesh(new THREE.BoxGeometry(1.18,.4,.84),olive);turret.add(dome);const gun=new THREE.Mesh(new THREE.CylinderGeometry(.09,.12,2.1,10),steel);gun.rotation.z=Math.PI/2;gun.position.set(1.23,.08,0);turret.add(gun);g.add(turret);return g;
+}
+const tankRoot=new THREE.Group();tankRoot.position.set(-8,-.15,-5);scene.add(tankRoot);
+function setTank(g){tankRoot.clear();g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});tankRoot.add(g)}
+setTank(fallbackTank());state.textContent='проверка загрузки GLB…';
+const url='https://raw.githubusercontent.com/tourzhao/Tanks3D/main/resources/models/tank_basic.glb';
+new GLTFLoader().load(url,gltf=>{
+ const obj=gltf.scene;obj.updateMatrixWorld(true);const bbox=new THREE.Box3().setFromObject(obj),size=bbox.getSize(new THREE.Vector3()),center=bbox.getCenter(new THREE.Vector3());
+ const max=Math.max(size.x,size.z,size.y),scale=2.8/Math.max(.001,max);
+ obj.scale.setScalar(scale);obj.position.set(-center.x*scale,-bbox.min.y*scale,-center.z*scale);
+ const rot=new THREE.Group();rot.add(obj);setTank(rot);
+ state.textContent='GLB загружен: танк Quaternius, лицензия CC0';state.style.color='#a9ecba';
+},undefined,error=>{state.textContent='GLB не загрузился — показана временная модель';state.style.color='#ffbda8';console.warn('External GLB failure',error)});
+const tower=new THREE.Group();tower.position.set(2.3,.0,3.8);scene.add(tower);
+const defensePad=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.85,.32,12),mat(0x6f7367));
+defensePad.position.set(2.3,-.05,3.8);defensePad.receiveShadow=true;scene.add(defensePad);
+const base=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.25,.4,8),steel);base.castShadow=true;base.receiveShadow=true;tower.add(base);
+const upper=new THREE.Group();upper.position.y=.65;tower.add(upper);
+const turret=new THREE.Mesh(new THREE.BoxGeometry(1.15,.65,1.05),olive);turret.castShadow=true;upper.add(turret);
+for(let off of [-.25,.25]){const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.075,.11,1.7,10),dark);barrel.rotation.z=Math.PI/2;barrel.position.set(1.13,0,off);barrel.castShadow=true;upper.add(barrel)}
+const disk=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.45,.22,8),sand);disk.position.y=-.25;disk.receiveShadow=true;tower.add(disk);
+// v11.5: штаб, окопы, бронеавтомобиль и тяжёлая машина — процедурные элементы.
+const details=new THREE.Group();scene.add(details);
+function place(g,geometry,material,x,y,z){const o=new THREE.Mesh(geometry,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;g.add(o);return o;}
+function buildArmoredCar(){
+ const g=new THREE.Group();g.position.set(-4,0,-5.0);
+ const chassis=place(g,new THREE.BoxGeometry(2.5,.28,1.35),steel,0,.5,0);
+ place(g,new THREE.BoxGeometry(2.05,.8,1.22),olive,-.08,1.04,0);
+ const cabin=place(g,new THREE.BoxGeometry(.85,.50,1.18),mat(0x69766d,.5,.08),.38,1.47,0);
+ const glass=mat(0x6c909a,.16,.1);
+ for(const z of [-.63,.63]){place(g,new THREE.BoxGeometry(.68,.25,.04),glass,.35,1.53,z);}
+ const wheelGeo=new THREE.CylinderGeometry(.43,.43,.26,16);
+ for(const x of [-.84,.84])for(const z of [-.69,.69]){
+  const w=place(g,wheelGeo,dark,x,.43,z);w.rotation.x=Math.PI/2;
+  const rim=place(g,new THREE.CylinderGeometry(.20,.20,.27,12),steel,x,.43,z*1.01);rim.rotation.x=Math.PI/2;
+ }
+ const gunMount=place(g,new THREE.CylinderGeometry(.43,.48,.20,12),steel,-.40,1.49,0);
+ const cannon=place(g,new THREE.BoxGeometry(1,.15,.16),dark,-.93,1.62,0);
+ details.add(g);return g;
+}
+function buildHeavyArmor(){
+ const g=new THREE.Group();g.position.set(-11,0,-1.5);
+ const skirt=place(g,new THREE.BoxGeometry(3.4,.6,1.8),dark,0,.55,0);
+ place(g,new THREE.BoxGeometry(3.05,.65,1.52),mat(0x667159,.92,.12),0,.91,0);
+ for(const z of [-.94,.94]){
+  place(g,new THREE.BoxGeometry(3.35,.58,.4),steel,0,.42,z);
+  for(let i=-2;i<=2;i++){
+   const w=place(g,new THREE.CylinderGeometry(.23,.23,.09,12),dark,i*.62,.39,z*1.23);w.rotation.x=Math.PI/2;
+  }
+ }
+ const rotating=new THREE.Group();rotating.position.set(-.1,1.37,0);g.add(rotating);
+ place(rotating,new THREE.CylinderGeometry(.75,.9,.47,8),olive,0,.17,0);
+ const gun=place(rotating,new THREE.CylinderGeometry(.13,.17,2.3,12),steel,1.36,.25,0);gun.rotation.z=Math.PI/2;
+ place(rotating,new THREE.BoxGeometry(.8,.24,.95),mat(0x889078),-.08,.47,0);
+ details.add(g);g.userData.turret=rotating;return g;
+}
+const car=buildArmoredCar(),heavy=buildHeavyArmor();
+const hqGlass=mat(0x6c909a,.16,.1);
+const hq=new THREE.Group();hq.position.set(10,-.05,8.2);details.add(hq);
+const concrete=mat(0x899085,.95),roof=mat(0x3a4b46,.84,.1),warning=mat(0xcfaa67,.67);
+place(hq,new THREE.CylinderGeometry(3.3,3.6,.30,8),concrete,0,.12,0);
+place(hq,new THREE.BoxGeometry(4.5,2.2,3.5),concrete,0,1.40,0);
+place(hq,new THREE.BoxGeometry(4.9,.32,3.85),roof,0,2.61,0);
+place(hq,new THREE.BoxGeometry(1.15,1.62,.12),steel,0,.88,1.80);
+place(hq,new THREE.BoxGeometry(1.08,.15,.13),warning,0,1.70,1.88);
+for(const x of [-1.35,1.35])place(hq,new THREE.BoxGeometry(.73,.63,.09),hqGlass,x,1.76,1.82);
+for(const x of [-1.7,1.7])for(const z of [-1.25,1.25])place(hq,new THREE.BoxGeometry(.4,2.7,.43),steel,x,1.43,z);
+const towerHq=place(hq,new THREE.CylinderGeometry(.55,.78,1.2,8),steel,1.30,3.13,-.80);
+place(hq,new THREE.CylinderGeometry(.06,.06,1.4,8),steel,1.3,4.22,-.80);
+for(const x of [7,8.2,9.4,10.6,11.8,13]){const box=place(details,new THREE.BoxGeometry(.78,.52,.55),sand,x,.09,10.1);box.rotation.y=.15;}
+for(const z of [3,4,5])place(details,new THREE.BoxGeometry(.82,.85,.82),sand,14,.30,z);
+// Refined machinegun turret: segmented armor, vented barrel shrouds, mechanical trunnions.
+const turPlate=place(upper,new THREE.BoxGeometry(1.36,.27,1.36),steel,0,-.43,0);
+for(const z of [-.44,.44]){
+ const side=place(upper,new THREE.BoxGeometry(.88,.48,.15),mat(0x667c67,.85,.1),-.18,.02,z);
+ side.rotation.x=z>0?.17:-.17;
+ place(upper,new THREE.CylinderGeometry(.18,.18,.16,12),dark,.35,.10,z*.9).rotation.x=Math.PI/2;
+}
+for(const z of [-.25,.25]){
+ for(let j=0;j<4;j++)place(upper,new THREE.CylinderGeometry(.125,.125,.07,8),steel,.65+j*.22,.06,z).rotation.z=Math.PI/2;
+}
+place(upper,new THREE.BoxGeometry(.6,.32,.55),mat(0x7b8b78,.85),-.18,.44,0);
+for(const x of [-.4,.4])place(tower,new THREE.BoxGeometry(.31,.2,.28),dark,x,.49,-.65);
+const muzzleGlow=new THREE.Mesh(new THREE.SphereGeometry(.17,8,8),new THREE.MeshBasicMaterial({color:0xffd28f,transparent:true,opacity:.85}));muzzleGlow.position.set(2.05,0,0);upper.add(muzzleGlow);muzzleGlow.visible=false;
+/* v11.5: заменяем грубые геометрические заглушки на отдельно загружаемые GLB.
+   Единый CC0 пак: https://3dassets.dev/packs/armoured-column-and-field-camp
+   Модели статичны: не выдаём их за анимированную технику. */
+const militaryPack='https://cdn.3dassets.dev/assets/';
+const militaryLoader=new GLTFLoader();
+const modelConfigs=[
+ {name:'Бронеавтомобиль',id:23672,target:car,max:3.4,rotate:Math.PI/2},
+ {name:'Тяжёлый танк',id:23667,target:heavy,max:4.5,rotate:Math.PI/2},
+ {name:'Пулемёт',id:23682,target:tower,max:2.1,rotate:-Math.PI/2},
+ {name:'Полевой штаб',id:23703,target:hq,max:3.05,rotate:0},
+ {name:'Зенитная установка',id:23683,pos:[-1.5,-.10,6.7],max:2.2,rotate:0},
+ {name:'Радар',id:23685,pos:[15.2,-.09,8.2],max:2.5,rotate:0},
+ {name:'Гусеничный БТР',id:23668,pos:[-12,-.06,-5.9],max:3.2,rotate:Math.PI/2},
+ {name:'Лёгкий танк',id:23673,pos:[5,-.06,-3.2],max:3.25,rotate:Math.PI/2},
+ {name:'Командная машина',id:23681,pos:[15,-.06,-2.4],max:3.1,rotate:Math.PI/2}
+];
+let loadedCount=0,failedCount=0;
+const modelSummary=document.getElementById('loadSummary');
+function reportAssets(){
+ modelSummary.textContent=loadedCount+'/'+modelConfigs.length+' GLB загружено'+(failedCount?' · ошибок: '+failedCount:'');
+ modelSummary.style.color=failedCount?'#f6bca9':'#bcdfbd';
+}
+reportAssets();
+for(const entry of modelConfigs){
+ const host=entry.target||new THREE.Group();
+ if(!entry.target){host.position.set(...entry.pos);details.add(host);}
+ const uri=militaryPack+entry.id+'/v1/model.glb';
+ militaryLoader.load(uri,(gltf)=>{
+  const obj=gltf.scene;
+  obj.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});
+  // Pack units are metres, +Y up, assets grounded at y=0.
+  // Scale each one uniformly; yaw is kept on the visual child.
+  const bounds=new THREE.Box3().setFromObject(obj);
+  const dims=bounds.getSize(new THREE.Vector3());
+  const factor=entry.max/Math.max(dims.x,dims.z,.01);
+  const center=bounds.getCenter(new THREE.Vector3());
+  obj.scale.setScalar(factor);
+  obj.position.set(-center.x*factor,-bounds.min.y*factor-.17,-center.z*factor);
+  const visual=new THREE.Group();visual.rotation.y=entry.rotate||0;visual.add(obj);
+  if(entry.target){
+   // Remove old box-shaped model only after real GLB is confirmed loaded.
+   for(const child of [...host.children])child.visible=false;
+  }
+  host.add(visual);loadedCount++;reportAssets();
+  if(entry.target===heavy)heavy.userData.turret=null;
+  if(entry.target===tower)muzzleGlow.visible=false;
+ },undefined,(e)=>{
+  failedCount++;reportAssets();
+  console.warn('GLB не удалось загрузить: '+entry.name,uri,e);
+ });
+}
+// Quaternius танк v11.0 остаётся без изменений как проверенный эталон.
+
+let detailed=true;document.getElementById('detail').onclick=()=>{detailed=!detailed;details.visible=detailed;document.getElementById('detail').textContent='Детали: '+(detailed?'вкл':'выкл')};
+
+// Combat presentation (visual-only): GLB vehicle movement, turret tracking, ballistic tracers and effects.
+// No gameplay damage, economy, enemy waves or tower balance is modified.
+const visualShots=[],visualExplosions=[],visualSmoke=[];
+const tracerMat=new THREE.MeshBasicMaterial({color:0xffd68d,transparent:true,opacity:1,depthWrite:false});
+const fireMat=new THREE.MeshBasicMaterial({color:0xffa04e,transparent:true,opacity:.8,depthWrite:false});
+const smokeMat=new THREE.MeshStandardMaterial({color:0x545d57,roughness:1,transparent:true,opacity:.55,depthWrite:false});
+let combatEnabled=true,attackTimer=.5,explosionTimer=4;
+let simulationTime=0,simSpeed=1,focusMode=false,shotsFired=0,hitsRegistered=0;
+let currentAim=0;
+const targetMarker=new THREE.Mesh(new THREE.RingGeometry(.62,.79,24),new THREE.MeshBasicMaterial({color:0xffb96a,transparent:true,opacity:.65,side:THREE.DoubleSide,depthWrite:false}));
+targetMarker.rotation.x=-Math.PI/2;targetMarker.position.y=.035;scene.add(targetMarker);
+const impactMarks=[];
+const impactMat=new THREE.MeshBasicMaterial({color:0x2b2824,transparent:true,opacity:.45,depthWrite:false,side:THREE.DoubleSide});
+function addImpactMark(point){
+ const mark=new THREE.Mesh(new THREE.CircleGeometry(.28+Math.random()*.26,18),impactMat.clone());
+ mark.rotation.x=-Math.PI/2;mark.position.set(point.x,-.076,point.z);scene.add(mark);
+ impactMarks.push({mesh:mark,life:13,maxLife:13});
+ if(impactMarks.length>20){const old=impactMarks.shift();scene.remove(old.mesh);old.mesh.material.dispose();old.mesh.geometry.dispose();}
+}
+const tracerGeometry=new THREE.SphereGeometry(.125,8,6),blastGeometry=new THREE.SphereGeometry(1,12,8),smokeGeometry=new THREE.IcosahedronGeometry(.25,0);
+let hudTick=0;
+document.getElementById('combat').onclick=()=>{combatEnabled=!combatEnabled;document.getElementById('combat').textContent='Бой: '+(combatEnabled?'вкл':'выкл')};
+const pathStart=1.5,pathEnd=roadCurve.getLength()-3;
+const aimingVector=new THREE.Vector3();
+function travelAt(v,root,reverse=false,lane=0){
+ const t=Math.max(.005,Math.min(.995,v));
+ const p=roadCurve.getPointAt(t),d=roadCurve.getTangentAt(t);
+ // Normalized lateral offset follows the ACTUAL curved road rather than global Z.
+ const n=new THREE.Vector3(-d.z,0,d.x).normalize();
+ root.position.x=p.x+n.x*lane;root.position.z=p.z+n.z*lane;
+ root.rotation.y=Math.atan2(-d.z,d.x)+(reverse?Math.PI:0);
+ root.userData.routeProgress=t;
+}
+function spawnTracer(origin,target,enemy){
+ const direction=target.clone().sub(origin);
+ if(direction.length()<.01)return;
+ const shot=new THREE.Mesh(tracerGeometry,tracerMat.clone());
+ shot.position.copy(origin);shot.scale.setScalar(1);
+ scene.add(shot);
+ visualShots.push({mesh:shot,start:origin.clone(),end:target.clone(),target:enemy,age:0,duration:Math.max(.12,Math.min(.48,direction.length()/28))});
+ shotsFired++;
+}
+function createBlast(at,large=false){
+ const burst=new THREE.Mesh(blastGeometry,fireMat.clone());
+ burst.position.copy(at);burst.position.y+=.35;burst.scale.setScalar(.1);scene.add(burst);
+ visualExplosions.push({mesh:burst,life:.68,maxLife:.68,large});
+ for(let i=0;i<6;i++){
+ const p=new THREE.Mesh(smokeGeometry,smokeMat.clone());
+ p.position.copy(at);p.position.x+=(Math.random()-.5)*.8;p.position.z+=(Math.random()-.5)*.8;
+ p.userData.velocity=new THREE.Vector3((Math.random()-.5)*1.5,.55+Math.random()*1.3,(Math.random()-.5)*1.5);
+ scene.add(p);visualSmoke.push({mesh:p,life:1.5,maxLife:1.5});
+ }
+ addImpactMark(at);
+}
+function advanceBattle(dt){
+ simulationTime+=dt;
+ // 3 vehicles share one lane-correct curved path and keep their relative intervals.
+ const p=(simulationTime*.023)%1;
+ travelAt(p,tankRoot,false,-.65);tankRoot.position.y=-.13;
+ travelAt((p+.31)%1,car,false,.68);car.position.y=-.08;
+ travelAt((p+.61)%1,heavy,false,-.3);heavy.position.y=-.08;
+ const enemies=[tankRoot,car,heavy];
+ const chosen=enemies.reduce((best,vehicle)=>{
+   const distance=vehicle.position.distanceTo(tower.position);
+   return distance<(best?.distance??Infinity)?{vehicle,distance}:best;
+ },null).vehicle;
+ const to=new THREE.Vector3(chosen.position.x,chosen.position.y+1.1,chosen.position.z);
+ targetMarker.position.set(chosen.position.x,-.075,chosen.position.z);
+ targetMarker.material.opacity=combatEnabled?.6:0;
+ const dx=to.x-tower.position.x,dz=to.z-tower.position.z;
+ const desired=Math.atan2(-dz,dx);
+ const delta=Math.atan2(Math.sin(desired-currentAim),Math.cos(desired-currentAim));
+ currentAim+=Math.max(-dt*2.2,Math.min(dt*2.2,delta));
+ upper.rotation.y=currentAim;
+ for(const child of tower.children)if(child!==upper&&child.visible&&child.type==='Group')child.rotation.y=currentAim;
+ if(combatEnabled){
+  attackTimer-=dt;
+  if(attackTimer<=0){
+   attackTimer=.52;
+   const origin=new THREE.Vector3(tower.position.x+Math.cos(currentAim)*1.1,tower.position.y+1.55,tower.position.z-Math.sin(currentAim)*1.1);
+   spawnTracer(origin,to,chosen);
+  }
+ }
+}
+function advanceBattleEffects(dt){
+ for(let i=visualShots.length-1;i>=0;i--){
+  const p=visualShots[i];p.age+=dt;
+  const progress=Math.min(1,p.age/p.duration);
+  // End point follows the moving target until impact.
+  if(p.target)p.end.set(p.target.position.x,p.target.position.y+1.05,p.target.position.z);
+  p.mesh.position.lerpVectors(p.start,p.end,progress);
+  p.mesh.material.opacity=Math.max(.15,1-progress*.5);
+  if(progress>=1){
+   const point=p.end.clone();scene.remove(p.mesh);p.mesh.material.dispose();visualShots.splice(i,1);
+   hitsRegistered++;createBlast(point,false);
+  }
+ }
+ for(let i=visualExplosions.length-1;i>=0;i--){
+  const p=visualExplosions[i];p.life-=dt;
+  const progress=1-Math.max(0,p.life)/p.maxLife;
+  p.mesh.scale.setScalar((p.large?2.0:.9)*(.3+progress));
+  p.mesh.material.opacity=Math.max(0,(1-progress)*.85);
+  if(p.life<=0){scene.remove(p.mesh);p.mesh.material.dispose();visualExplosions.splice(i,1);}
+ }
+ for(let i=visualSmoke.length-1;i>=0;i--){
+  const p=visualSmoke[i],m=p.mesh;p.life-=dt;m.position.addScaledVector(m.userData.velocity,dt);
+  m.scale.setScalar(1+(1-p.life/p.maxLife)*1.5);m.material.opacity=Math.max(0,p.life/p.maxLife*.5);
+  if(p.life<=0){scene.remove(m);m.material.dispose();visualSmoke.splice(i,1);}
+ }
+ for(let i=impactMarks.length-1;i>=0;i--){
+  const mark=impactMarks[i];mark.life-=dt;mark.mesh.material.opacity=.44*Math.max(0,mark.life/mark.maxLife);
+  if(mark.life<=0){scene.remove(mark.mesh);mark.mesh.geometry.dispose();mark.mesh.material.dispose();impactMarks.splice(i,1);}
+ }
+ hudTick+=dt;
+ if(hudTick>.35){
+ document.getElementById('battleStatus').textContent='Конвой: 3 · выстрелы: '+shotsFired+' · попадания: '+hitsRegistered+' · следы: '+impactMarks.length;
+ hudTick=0;
+ }
+}
+let autoRotate=true,moving=true,night=false,offset=0,forward=true,last=performance.now();
+let fpsFrames=0,fpsElapsed=0;
+function updateFrameDiagnostics(dt){
+ fpsFrames++;fpsElapsed+=dt;
+ if(fpsElapsed>=1){
+  const fps=Math.round(fpsFrames/fpsElapsed);
+  document.getElementById('perf').textContent='FPS: '+fps+' · GLB: '+loadedCount+'/9 · эффекты: '+(visualShots.length+visualExplosions.length+visualSmoke.length);
+  fpsFrames=0;fpsElapsed=0;
+ }
+}
+document.getElementById('rotate').onclick=()=>{autoRotate=!autoRotate;document.getElementById('rotate').textContent='Поворот камеры: '+(autoRotate?'вкл':'выкл')};
+document.getElementById('move').onclick=()=>{moving=!moving;document.getElementById('move').textContent='Конвой: '+(moving?'движение':'стоп')};
+document.getElementById('light').onclick=()=>{night=!night;sun.intensity=night?1.25:3.5;hemi.intensity=night?.65:1.25;scene.background.setHex(night?0x303b47:0xaeb6a8);scene.fog.color.copy(scene.background);renderer.toneMappingExposure=night?.78:1.08};
+document.getElementById('reset').onclick=()=>{offset=0;forward=true;camera.position.set(18,21,24);orbit.target.set(0,0,0);orbit.update()};
+function draw(now){requestAnimationFrame(draw);const dt=Math.min(.06,(now-last)/1000);last=now;
+ if(autoRotate){const p=camera.position.clone().sub(orbit.target),a=dt*.055;camera.position.set(orbit.target.x+p.x*Math.cos(a)-p.z*Math.sin(a),camera.position.y,orbit.target.z+p.x*Math.sin(a)+p.z*Math.cos(a))}
+ if(moving){advanceBattle(dt,now)}updateFrameDiagnostics(dt)
+ if(heavy.userData.turret)heavy.userData.turret.rotation.y=Math.sin(now*.0004)*.32;
+ // Car is now positioned by road traversal.
+ muzzleGlow.visible=!loadedCount&&Math.sin(now*.014)>0.97;
+ orbit.update();const aspect=innerWidth/innerHeight;camera.left=-12*aspect;camera.right=12*aspect;camera.top=12;camera.bottom=-12;camera.updateProjectionMatrix();renderer.render(scene,camera)}
+requestAnimationFrame(draw);addEventListener('resize',()=>renderer.setSize(innerWidth,innerHeight));
+</script></body></html>
