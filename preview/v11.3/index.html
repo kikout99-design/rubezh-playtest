@@ -92,7 +92,7 @@ function fallbackTank(){
  for(let i=-1;i<=1;i++){const w=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.08,12),dark);w.rotation.x=Math.PI/2;w.position.set(i*.7,.43,side*1.22);g.add(w)}}
  const turret=new THREE.Group();turret.position.y=1.2;const dome=new THREE.Mesh(new THREE.BoxGeometry(1.18,.4,.84),olive);turret.add(dome);const gun=new THREE.Mesh(new THREE.CylinderGeometry(.09,.12,2.1,10),steel);gun.rotation.z=Math.PI/2;gun.position.set(1.23,.08,0);turret.add(gun);g.add(turret);return g;
 }
-const tankRoot=new THREE.Group();tankRoot.position.set(-8,0,-5);scene.add(tankRoot);
+const tankRoot=new THREE.Group();tankRoot.position.set(-8,-.15,-5);scene.add(tankRoot);
 function setTank(g){tankRoot.clear();g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});tankRoot.add(g)}
 setTank(fallbackTank());state.textContent='проверка загрузки GLB…';
 const url='https://raw.githubusercontent.com/tourzhao/Tanks3D/main/resources/models/tank_basic.glb';
@@ -113,7 +113,7 @@ const disk=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.45,.22,8),sand);disk
 const details=new THREE.Group();scene.add(details);
 function place(g,geometry,material,x,y,z){const o=new THREE.Mesh(geometry,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;g.add(o);return o;}
 function buildArmoredCar(){
- const g=new THREE.Group();g.position.set(-4,.08,-5.0);
+ const g=new THREE.Group();g.position.set(-4,0,-5.0);
  const chassis=place(g,new THREE.BoxGeometry(2.5,.28,1.35),steel,0,.5,0);
  place(g,new THREE.BoxGeometry(2.05,.8,1.22),olive,-.08,1.04,0);
  const cabin=place(g,new THREE.BoxGeometry(.85,.50,1.18),mat(0x69766d,.5,.08),.38,1.47,0);
@@ -129,7 +129,7 @@ function buildArmoredCar(){
  details.add(g);return g;
 }
 function buildHeavyArmor(){
- const g=new THREE.Group();g.position.set(-11,.03,-1.5);
+ const g=new THREE.Group();g.position.set(-11,0,-1.5);
  const skirt=place(g,new THREE.BoxGeometry(3.4,.6,1.8),dark,0,.55,0);
  place(g,new THREE.BoxGeometry(3.05,.65,1.52),mat(0x667159,.92,.12),0,.91,0);
  for(const z of [-.94,.94]){
@@ -209,7 +209,7 @@ for(const entry of modelConfigs){
   const factor=entry.max/Math.max(dims.x,dims.z,.01);
   const center=bounds.getCenter(new THREE.Vector3());
   obj.scale.setScalar(factor);
-  obj.position.set(-center.x*factor,-bounds.min.y*factor-.055,-center.z*factor);
+  obj.position.set(-center.x*factor,-bounds.min.y*factor-.17,-center.z*factor);
   const visual=new THREE.Group();visual.rotation.y=entry.rotate||0;visual.add(obj);
   if(entry.target){
    // Remove old box-shaped model only after real GLB is confirmed loaded.
@@ -234,7 +234,7 @@ document.getElementById('light').onclick=()=>{night=!night;sun.intensity=night?1
 document.getElementById('reset').onclick=()=>{offset=0;forward=true;camera.position.set(18,21,24);orbit.target.set(0,0,0);orbit.update()};
 function draw(now){requestAnimationFrame(draw);const dt=Math.min(.06,(now-last)/1000);last=now;
  if(autoRotate){const p=camera.position.clone().sub(orbit.target),a=dt*.055;camera.position.set(orbit.target.x+p.x*Math.cos(a)-p.z*Math.sin(a),camera.position.y,orbit.target.z+p.x*Math.sin(a)+p.z*Math.cos(a))}
- if(moving){offset+=(forward?1:-1)*dt*.9;if(offset>12){forward=false}if(offset<0){forward=true}tankRoot.position.x=-8+offset;tankRoot.position.z=-5+Math.max(0,offset-5)*.19;tankRoot.rotation.y=forward?-.10:Math.PI-.10}
+ if(moving){offset+=(forward?1:-1)*dt*.9;if(offset>12){forward=false}if(offset<0){forward=true}tankRoot.position.x=-8+offset;tankRoot.position.y=-.15;tankRoot.position.z=-5+Math.max(0,offset-5)*.19;tankRoot.rotation.y=forward?-.10:Math.PI-.10}
  upper.rotation.y=Math.sin(now*.0007)*.9;if(heavy.userData.turret)heavy.userData.turret.rotation.y=Math.sin(now*.0004)*.32;
  car.position.x=-4+Math.sin(now*.00027)*.7;
  muzzleGlow.visible=!loadedCount&&Math.sin(now*.014)>0.97;
