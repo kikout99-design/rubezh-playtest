@@ -289,7 +289,7 @@ function buildHeavyArmor(){
 }
 const car=buildArmoredCar(),heavy=buildHeavyArmor();
 const hqGlass=mat(0x6c909a,.16,.1);
-const hq=new THREE.Group();hq.position.set(10,-.05,8.2);details.add(hq);
+const hq=new THREE.Group();hq.position.set(10,-.05,8.2);scene.add(hq); // HQ stays visible in gameplay even when demonstration models are hidden.
 const hqFortifications=new THREE.Group();scene.add(hqFortifications);
 const concrete=mat(0x899085,.95),roof=mat(0x3a4b46,.84,.1),warning=mat(0xcfaa67,.67);
 place(hq,new THREE.CylinderGeometry(3.3,3.6,.30,8),concrete,0,.12,0);
@@ -801,7 +801,8 @@ function constrainVehicleSize(wrapper,maxFootprint=2.65){
  const center=adjusted.getCenter(new THREE.Vector3());
  // Keep the model centered on the route with tracks at ground level.
  const min=adjusted.min;
- for(const c of wrapper.children){c.position.x-=center.x;c.position.z-=center.z;c.position.y-=min.y;}
+ const invScale=1/Math.max(.000001,wrapper.scale.x);
+ for(const c of wrapper.children){c.position.x-=center.x*invScale;c.position.z-=center.z*invScale;c.position.y-=min.y*invScale;}
  wrapper.updateMatrixWorld(true);
  return new THREE.Box3().setFromObject(wrapper).getSize(new THREE.Vector3()).length()<8;
 }
