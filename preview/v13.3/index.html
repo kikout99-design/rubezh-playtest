@@ -12,7 +12,7 @@ button{background:#37594c;border:1px solid #829c87;border-radius:7px;color:white
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script></head>
 <body><div id="view"></div>
 <div class="panel"><h1>РУБЕЖ · v13.3 / графический прототип</h1>
-<p>БЕЗОПАСНЫЙ ВОЗВРАТ GLB ПРОТИВНИКОВ: четыре разных модели наземной техники; проверка до показа, ограничение габаритов, аварийное переключение на безопасные модели. Башни, волны и дороги сохранены.</p>
+<p>БЕЗОПАСНЫЙ ВОЗВРАТ GLB ПРОТИВНИКОВ: три разных модели наземной техники; проверка до показа, ограничение габаритов, аварийное переключение на безопасные модели. Башни, волны и дороги сохранены.</p>
 <p>Готовые модели: <span id="state">загрузка…</span><p id="loadSummary" style="font-size:11px">0/0 моделей</p><p id="assetDiagnostic" style="font-size:11px;max-width:500px;white-space:pre-wrap">Проверка моделей…</p><p id="sceneAssets" style="font-size:11px;max-width:500px;white-space:pre-wrap;color:#bbe5cb">Дополнительные CC0-объекты загружаются…</p><p id="perf" style="font-size:11px">FPS: — · графика: ожидание</p><p id="battleStatus" style="font-size:11px">Конвой: 0 · выстрелы: 0 · попадания: 0</p></p>
 <div class="controls"><button id="rotate">Поворот камеры: вкл</button><button id="move">Конвой: движение</button><button id="light">Время суток</button><button id="detail">Детали: вкл</button><button id="combat">Бой: вкл</button><button id="speed">Скорость: 1×</button><button id="focus">Камера: обзор</button><button id="showAssetDiagnostics">Ассеты: подробнее</button><button id="testPack">Проверить единый GLB</button><button id="reset">Сброс</button><button id="playgame">Игровой режим</button></div>
 </div><div id="gameUI" style="display:none;position:fixed;z-index:4;top:12px;right:12px;width:min(365px,calc(100vw - 24px));max-height:92vh;overflow:auto;background:#13251fee;border:1px solid #7b9986;border-radius:12px;padding:12px 14px;box-shadow:0 12px 32px #0009">
@@ -892,6 +892,7 @@ document.getElementById('enemyAssets').onclick=()=>{
   for(const enemy of gameEnemies){
    if(enemy.dead||!enemy.model.userData.glb)continue;
    game.remove(enemy.model);
+   enemyRealCount=Math.max(0,enemyRealCount-1);
    enemy.model=safeEnemyMesh(enemy.kind);
    enemySafeCount++;
    game.add(enemy.model);
@@ -906,6 +907,7 @@ function validateEnemySize(enemy){
  if(Number.isFinite(size.x)&&Number.isFinite(size.y)&&Number.isFinite(size.z)&&
     Math.max(size.x,size.z)<=3.1&&size.y<=3.2)return true;
  enemySizeViolations++;
+ if(enemy.model.userData.glb)enemyRealCount=Math.max(0,enemyRealCount-1);
  game.remove(enemy.model);
  enemy.model=safeEnemyMesh(enemy.kind);enemySafeCount++;game.add(enemy.model);updateEnemyPosition(enemy);
  return false;
