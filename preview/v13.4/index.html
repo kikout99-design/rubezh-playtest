@@ -669,6 +669,20 @@ const padFoundationMat=new THREE.MeshStandardMaterial({color:0x777e71,roughness:
 const padAvailable=new THREE.MeshStandardMaterial({color:0x728576,emissive:0x07160e,emissiveIntensity:.13,roughness:.96});
 const padTaken=new THREE.MeshStandardMaterial({color:0x686c62,roughness:.93});
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+const selectedPadMarker=new THREE.Mesh(new THREE.RingGeometry(1.11,1.19,40),
+ new THREE.MeshBasicMaterial({color:0xffd178,transparent:true,opacity:.92,side:THREE.DoubleSide,depthWrite:false}));
+selectedPadMarker.rotation.x=-Math.PI/2;selectedPadMarker.position.y=.13;
+selectedPadMarker.visible=false;game.add(selectedPadMarker);
+const rangeMarker=new THREE.Mesh(new THREE.RingGeometry(.985,1,80),
+ new THREE.MeshBasicMaterial({color:0xffdf96,transparent:true,opacity:.52,side:THREE.DoubleSide,depthWrite:false}));
+rangeMarker.rotation.x=-Math.PI/2;rangeMarker.position.y=-.012;rangeMarker.visible=false;game.add(rangeMarker);
+function showTowerSelection(tw){
+ selectedPadMarker.visible=!!tw;rangeMarker.visible=!!tw;
+ if(!tw)return;
+ selectedPadMarker.position.x=tw.base.position.x;selectedPadMarker.position.z=tw.base.position.z;
+ rangeMarker.position.x=tw.base.position.x;rangeMarker.position.z=tw.base.position.z;
+ rangeMarker.scale.setScalar(tw.range);
+}
 for(let i=0;i<buildPositions.length;i++){
  const [x,z]=buildPositions[i];
  const node=new THREE.Mesh(padBase,padAvailable);
@@ -756,7 +770,7 @@ function addTower(pad){
  updateSelected();
 }
 function updateSelected(){
- const tw=gameControl.selectedTower;
+ const tw=gameControl.selectedTower;showTowerSelection(tw);
  document.getElementById('selectedTower').textContent=tw?tw.type.name+' · уровень '+tw.level+'/6 · урон '+Math.round(tw.damage)+' · дальность '+tw.range.toFixed(1):'Башня не выбрана';
 }
 renderer.domElement.addEventListener('pointerdown',e=>{
@@ -805,6 +819,15 @@ const healthBarGeometry=new THREE.PlaneGeometry(1.6,.16);
 const healthTrackGeometry=new THREE.PlaneGeometry(1.67,.23);
 const healthBackMat=new THREE.MeshBasicMaterial({color:0x242e2a,depthTest:false,side:THREE.DoubleSide});
 const healthFrontMat=new THREE.MeshBasicMaterial({color:0xa8d87a,depthTest:false,side:THREE.DoubleSide});
+const enemyClassColors={vehicle:0xc2c9af,scout:0x7ed2d1,heavy:0xe9a15a,drone:0xb7acff,transport:0xe3d484,bomber:0xe17676};
+const classMarkerGeometry=new THREE.RingGeometry(.31,.43,16);
+function addClassMarker(e){
+ const ring=new THREE.Mesh(classMarkerGeometry,new THREE.MeshBasicMaterial({
+  color:enemyClassColors[e.kind]||0xffffff,transparent:true,opacity:.8,side:THREE.DoubleSide,depthWrite:false
+ }));
+ ring.rotation.x=-Math.PI/2;ring.position.y=-.085;e.model.add(ring);
+ e.classMarker=ring;
+}
 function enemyHealthBar(e){
  const back=new THREE.Mesh(healthTrackGeometry,healthBackMat);
  const front=new THREE.Mesh(healthBarGeometry,healthFrontMat.clone());
@@ -922,7 +945,7 @@ document.getElementById('enemyAssets').onclick=()=>{
    enemyRealCount=Math.max(0,enemyRealCount-1);
    enemy.model=safeEnemyMesh(enemy.kind);
    enemySafeCount++;
-   game.add(enemy.model);
+   game.add(enemy.model);addClassMarker(enemy);
    updateEnemyPosition(enemy);
   }
  }
@@ -936,7 +959,7 @@ function validateEnemySize(enemy){
  enemySizeViolations++;
  if(enemy.model.userData.glb)enemyRealCount=Math.max(0,enemyRealCount-1);
  game.remove(enemy.model);
- enemy.model=safeEnemyMesh(enemy.kind);enemySafeCount++;game.add(enemy.model);updateEnemyPosition(enemy);
+ enemy.model=safeEnemyMesh(enemy.kind);enemySafeCount++;game.add(enemy.model);addClassMarker(enemy);updateEnemyPosition(enemy);
  return false;
 }
 // Air roles enter later waves; temporary geometry is explicitly a preview asset.
@@ -953,7 +976,7 @@ function spawnEnemy(){
  const maxHp=(kind==='heavy'?220:kind==='scout'?55:kind==='drone'?60:kind==='transport'?155:kind==='bomber'?270:110)*(1+(wave-1)*.23);
  const enemy={kind,lane,curve,progress:0,speed:(kind==='scout'?.022:kind==='heavy'?.009:kind==='drone'?.028:kind==='transport'?.018:kind==='bomber'?.019:.014),hp:maxHp,maxHp,slow:0,stun:0,burn:0,model:enemyMesh(kind),dead:false};
  game.add(enemy.model);gameEnemies.push(enemy);updateEnemyPosition(enemy);
- enemySpawnCount++;validateEnemySize(enemy);enemyHealthBar(enemy);updateEnemyHealthBar(enemy);spawnDiagnostics();
+ enemySpawnCount++;validateEnemySize(enemy);addClassMarker(enemy);enemyHealthBar(enemy);updateEnemyHealthBar(enemy);spawnDiagnostics();
 }
 function updateEnemyPosition(e){
  const p=e.curve.getPointAt(Math.min(.999,e.progress)),d=e.curve.getTangentAt(Math.min(.999,e.progress));
